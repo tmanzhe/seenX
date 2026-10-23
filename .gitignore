@@ -1,0 +1,30 @@
+# macOS
+.DS_Store
+
+# Local environment configuration
+.env
+.env.*
+!.env.example
+
+# Python environments and generated files
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Rust and Swift build output
+/target/
+.build/
+DerivedData/
+xcuserdata/
+
+# Local image collections
+/practice-images/
+
+# Local notes and exercises
+/docs/ROADMAP.md
+/docs/TEACHING_PLAN.md
+/docs/LEARNING_START.md
+/lessons/
+/lesson_*.py
