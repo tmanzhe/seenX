@@ -1,0 +1,15 @@
+{
+  "name": "seenx",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": ["apps/web"],
+  "scripts": {
+    "dev": "npm run dev --workspace @seenx/web --",
+    "build": "npm run build --workspace @seenx/web",
+    "typecheck": "npm run typecheck --workspace @seenx/web",
+    "core:check": "cargo check --offline --workspace"
+  },
+  "engines": {
+    "node": ">=20.9.0"
+  }
+}
