@@ -28,3 +28,20 @@ xcuserdata/
 /docs/LEARNING_START.md
 /lessons/
 /lesson_*.py
+
+# JavaScript dependencies and web build output
+node_modules/
+.next/
+/apps/web/out/
+*.tsbuildinfo
+next-env.d.ts
+npm-debug.log*
+
+# Local model assets
+/models/
+
+# Local experiment data, outputs, and notebook caches
+.ipynb_checkpoints/
+/experiments/data/
+/experiments/outputs/
+/experiments/.cache/
