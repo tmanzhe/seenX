@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Icon } from "../components/icon";
 import { SearchDemo } from "../components/search-demo";
+import { MemoryMotion } from "../components/memory-motion";
 import { UseCases } from "../components/use-cases";
 
 export default function Home() {
@@ -12,12 +13,7 @@ export default function Home() {
         <p className="hero-description">The screenshot. The place. That one thing you saved.<br className="desktop-break" /> Visual memory for you—and the AI agents you build.</p>
         <div className="hero-actions"><a href="#demo" className="button button-orange">Explore the preview <Icon name="arrow" size={17} /></a><Link href="/docs" className="text-link">See what we’re building <Icon name="diagonal" size={15} /></Link></div>
         <div className="hero-footnote"><Icon name="monitor" size={14} /> Local engine first <span>·</span> Free, with optional support <span>·</span> In development</div>
-        <div className="memory-study" aria-hidden="true">
-          <div className="memory-fragment"><img src="/images/coastline.jpg" alt="" /><small>A place worth saving</small></div>
-          <div className="memory-fragment"><img src="/images/alpine-lake.jpg" alt="" /><small>That one by the lake</small></div>
-          <div className="memory-fragment"><img src="/images/mountain-light.jpg" alt="" /><small>A little further away</small></div>
-          <span className="memory-signal"><i /> A few fragments. One memory.</span>
-        </div>
+        <MemoryMotion />
       </section>
       <div className="demo-section"><SearchDemo /></div>
 

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Icon } from "./icon";
+import { ThemeToggle } from "./theme-toggle";
 
 export function Brand() {
   return <Link href="/" className="brand" aria-label="seenX home"><span className="brand-symbol" aria-hidden="true"><i /><i /><i /><i /></span><span>seen<span className="brand-x">X</span></span></Link>;
@@ -15,7 +16,7 @@ export function Header() {
           <Link href="/docs">Docs</Link>
           <Link href="/support" className="nav-support">Support <Icon name="heart" size={14} /></Link>
         </nav>
-        <Link href="/#demo" className="button button-small button-dark">Try the preview <Icon name="diagonal" size={15} /></Link>
+        <ThemeToggle /><Link href="/#demo" className="button button-small button-dark">Try the preview <Icon name="diagonal" size={15} /></Link>
       </div>
     </header>
   );
