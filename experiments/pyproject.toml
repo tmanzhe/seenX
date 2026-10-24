@@ -1,0 +1,9 @@
+[project]
+name = "seenx-experiments"
+version = "0.1.0"
+description = "Python learning and retrieval proofs of concept for seenX"
+requires-python = ">=3.13"
+dependencies = []
+
+[tool.uv]
+package = false
