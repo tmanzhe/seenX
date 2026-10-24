@@ -35,7 +35,7 @@ export const buildJournal = [
     kind: "Working agreement",
     title: "Understand one step before adding the next.",
     detail: "The full plan felt like too much at once. The agreed pace is to explain the next idea, make one small change, inspect it together, and pause for review and approval before continuing.",
-    takeaway: "Understanding the change is part of finishing the step. The Python setup and experiment are still pending.",
+    takeaway: "Understanding the change is part of finishing the step. The isolated Python environment is configured; image loading and retrieval are still pending.",
   },
 ];
 
@@ -43,8 +43,8 @@ export const experimentSteps = [
   {
     title: "Set up the Python project",
     summary: "A separate place for the experiment and its dependencies.",
-    explanation: "uv will create a virtual environment inside experiments/. pyproject.toml describes the packages we need; uv.lock records exact versions so the setup can be repeated. We will use Jupyter, PyTorch, Transformers, Pillow, NumPy, and Matplotlib.",
-    done: "The environment runs Python and imports the required packages. No model download or search code yet.",
+    explanation: "A Python 3.13 virtual environment is configured inside experiments/. pyproject.toml records the project requirements. No third-party packages are installed yet. Add image loading first, then notebook and model dependencies in separate steps.",
+    done: "Completed: the environment runs Python and isolation is verified. Image and model dependencies follow later.",
   },
   {
     title: "Load ten of my images",

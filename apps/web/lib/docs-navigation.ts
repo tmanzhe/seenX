@@ -5,7 +5,7 @@ export type DocSearchEntry = DocLink & { description: string; group: string; key
 export const docNavigation: DocGroup[] = [
   { title: "Get started", links: [
     { href: "/docs", title: "What is seenX?" },
-    { href: "/docs/getting-started", title: "Start here" },
+    { href: "/docs/getting-started", title: "Local development" },
   ] },
   { title: "Use cases", links: [
     { href: "/docs/personal-search", title: "For your own memory" },
@@ -16,15 +16,26 @@ export const docNavigation: DocGroup[] = [
     { href: "/docs/how-search-works", title: "Search & metadata" },
     { href: "/docs/privacy", title: "Privacy & local data" },
   ] },
-  { title: "Build & learn", links: [
-    { href: "/docs/python-to-rust", title: "Python → Rust" },
-    { href: "/docs/ontology", title: "Ontology & learning" },
+  { title: "Reference", links: [
+    { href: "/docs/ontology", title: "Entities & relationships" },
     { href: "/docs/architecture", title: "Architecture" },
-    { href: "/docs/learning", title: "Learning notes" },
   ] },
   { title: "The project", links: [
     { href: "/docs/roadmap", title: "Roadmap" },
     { href: "/docs/open-source", title: "Open source & support" },
+  ] },
+];
+
+export const learningNavigation: DocGroup[] = [
+  { title: "Learning", links: [
+    { href: "/learning", title: "Learning overview" },
+    { href: "/learning/python-to-rust", title: "Python → Rust" },
+    { href: "/learning/ontology", title: "Ontology experiment" },
+  ] },
+  { title: "Notebook", links: [
+    { href: "/learning#build-journal", title: "Build journal" },
+    { href: "/learning#concepts", title: "Concepts" },
+    { href: "/learning#my-notes", title: "Personal notes" },
   ] },
 ];
 

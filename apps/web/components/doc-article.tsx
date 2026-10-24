@@ -1,14 +1,15 @@
 import Link from "next/link";
 import type { DocPage } from "../lib/docs";
 import { prepareArticle } from "../lib/doc-content";
-import { docNavigation } from "../lib/docs-navigation";
+import { docNavigation, learningNavigation } from "../lib/docs-navigation";
 import { PageOutline } from "./page-outline";
 import { Icon } from "./icon";
 
-export function DocArticle({ page }: { page: DocPage }) {
-  const href = page.slug ? `/docs/${page.slug}` : "/docs";
-  const group = docNavigation.find((section) => section.links.some((link) => link.href === href));
-  const links = docNavigation.flatMap((section) => section.links);
+export function DocArticle({ page, learning = false }: { page: DocPage; learning?: boolean }) {
+  const navigation = learning ? learningNavigation : docNavigation;
+  const href = page.slug ? `${learning ? "/learning" : "/docs"}/${page.slug}` : "/docs";
+  const group = navigation.find((section) => section.links.some((link) => link.href === href));
+  const links = navigation.flatMap((section) => section.links);
   const index = links.findIndex((link) => link.href === href);
   const previous = links[index - 1];
   const next = links[index + 1];

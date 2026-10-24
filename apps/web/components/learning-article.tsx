@@ -9,8 +9,8 @@ export function LearningArticle() {
     <div className="docs-article-layout">
     <main id="main" className="docs-main learning-doc">
       <header className="learning-header">
-        <span className="docs-breadcrumb">Build & learn</span>
-        <h1>Learning notes</h1>
+        <span className="docs-breadcrumb">Learning</span>
+        <h1>Learning</h1>
         <p>The build journal, experiments, concepts, and notes. One small step at a time.</p>
         <div className="learning-meta"><span><span className="status-dot" /> Learning in progress</span><span>Build notes updated <time dateTime={learningUpdated}>October 24, 2026</time></span></div>
       </header>
@@ -22,7 +22,7 @@ export function LearningArticle() {
             <h2 id="now-heading">One question to begin with.</h2>
             <blockquote>“Can I find an image just by describing what I remember?”</blockquote>
             <p>We’ll test that in Python with my own images, before connecting a model to the app. First ten images, then a bigger collection once the pipeline works.</p>
-            <div className="learning-next"><Icon name="terminal" size={21} /><div><span>NEXT BUILD STEP · AFTER REVIEW</span><h3>Set up the isolated Python project.</h3><p>Understand the environment and its two project files. Then make that one change and pause.</p></div></div>
+            <div className="learning-next"><Icon name="terminal" size={21} /><div><span>NEXT BUILD STEP · AFTER REVIEW</span><h3>Load and inspect ten images.</h3><p>The isolated Python environment is configured. Choose a practice folder, then load images and inspect thumbnails before introducing a model.</p></div></div>
             <div className="learning-agreement"><strong>Our pace</strong><span>Explain <span aria-hidden="true">→</span> Make one change <span aria-hidden="true">→</span> Inspect <span aria-hidden="true">→</span> Review & approve</span></div>
           </section>
 
