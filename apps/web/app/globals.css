@@ -1373,3 +1373,23 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .roadmap-stage-status > span + span { background: transparent; color: var(--muted); }
 .docs-site .prose .roadmap-done { display: grid; gap: 7px; padding: 16px 18px; margin: 20px 0 0; border-radius: 10px; border: 1px solid var(--line); background: var(--glass); font-size: 13px; }
 .roadmap-done > strong { color: var(--accent); font-size: 10px; letter-spacing: .7px; text-transform: uppercase; }
+
+.portability-section { display: grid; grid-template-columns: 1fr 1fr; gap: 65px; align-items: center; padding-top: 55px; padding-bottom: 65px; border-top: 1px solid var(--line); }
+.portability-copy h2 { font-size: clamp(34px, 4vw, 48px); font-weight: 450; line-height: 1.15; letter-spacing: -1.8px; margin: 19px 0; }
+.portability-copy h2 em { font-family: inherit; font-style: normal; color: var(--brand); }
+.portability-copy p { font-size: 13px; line-height: 1.9; color: var(--muted); margin-bottom: 22px; }
+.portability-visual { padding: 24px; border: 1px solid var(--line); border-radius: 20px; background: var(--glass); }
+.portability-visual > .concept-badge { display: table; margin-left: auto; }
+.portability-route { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 28px 0 24px; }
+.portability-route > div { display: grid; justify-items: center; gap: 12px; color: var(--muted); font-size: 10px; }
+.portability-route > svg { color: var(--brand); flex-shrink: 0; }
+.portability-route > .portability-archive { color: var(--accent); padding: 18px 17px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+.portability-visual > p { text-align: center; color: var(--ink); font-size: 12px; line-height: 1.85; }
+.portability-visual > small { display: block; text-align: center; font-size: 9px; color: var(--muted); line-height: 1.8; margin-top: 15px; }
+@media (max-width: 700px) {
+  .portability-section { grid-template-columns: 1fr; gap: 27px; padding-top: 40px; padding-bottom: 45px; }
+  .portability-visual { padding: 20px; }
+  .portability-route { gap: 8px; }
+  .portability-route > div { font-size: 9px; }
+  .portability-route > .portability-archive { padding: 15px 12px; }
+}

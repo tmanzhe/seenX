@@ -38,10 +38,16 @@ export const roadmapStages = [
     done: "A tested client retrieves the same image, selected text, coordinates, and notes as human search; revoked sources are unavailable to future requests. Cloud disclosure is explicit.",
   },
   {
-    number: "06", title: "Production engine + desktop beta", status: "Planned", scope: "V1 release gate",
+    number: "06", title: "Portable library + restore", status: "Planned", scope: "V1 durability",
+    goal: "Take your images and their meaning to your next laptop, without starting over.",
+    tasks: ["Export all or selected collections as a complete library with image originals, or as context-only metadata that can be relinked to existing files.", "Preserve stable image/revision IDs, notes, selected text, highlights, typed relationships, source history, and a versioned manifest with content hashes.", "Offer an optional passphrase-protected archive. Make a consistent snapshot; keep credentials, assistant grants, and machine-specific permissions out of the transferable library.", "Validate imports, preview missing files and conflicts, and reuse only compatible search indexes. Rebuild derived indexes when needed; reconnect external folders and assistants deliberately."],
+    done: "Restore a complete archive into a fresh library on another Mac and recover the same images, notes, highlight coordinates, and relationships. A context-only import identifies and relinks matching originals. Test missing/corrupt files, schema versions, duplicate IDs, and encrypted-archive recovery.",
+  },
+  {
+    number: "07", title: "Production engine + desktop beta", status: "Planned", scope: "V1 release gate",
     goal: "Package a reliable, inspectable local app rather than a collection of demos.",
     tasks: ["Gradually replace proven Python engine responsibilities with Rust while keeping contract and retrieval parity. Python remains the evaluation reference.", "Choose local model runtimes after packaging and preprocessing checks; a Core ML integration or Swift/Rust binding is not already implemented.", "Validate offline operation after model installation, indexing recovery, note/search updates, deletion, exports, access revocation, and resource use.", "Complete signing, notarization, installation checks, licensing, and the first supported assistant setup."],
-    done: "A clean Mac install completes real capture → annotate → restart → human search → assistant retrieval. Production does not require users to install Python.",
+    done: "A clean Mac install completes real capture → annotate → restart → human search → assistant retrieval, plus verified export and restore on a second Mac. Production does not require users to install Python.",
   },
 ] as const;
 

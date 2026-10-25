@@ -16,6 +16,7 @@ export const docNavigation: DocGroup[] = [
   { title: "How it works", links: [
     { href: "/docs/how-search-works", title: "Hybrid search & vectors" },
     { href: "/docs/privacy", title: "Privacy & local data" },
+    { href: "/docs/portability", title: "Transfer & restore" },
   ] },
   { title: "Reference", links: [
     { href: "/docs/ontology", title: "Memory ontology" },

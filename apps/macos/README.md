@@ -9,6 +9,7 @@
 - Apple Vision OCR adapters that preserve text and locations, after image-orientation normalization.
 - Whole-image notes, exact text highlights, pins, and region annotations attached to immutable image revisions.
 - Folder/capture permission lifecycle, source inspection, export, and clear assistant-sharing controls.
+- Planned library transfer/restore UI: complete or context-only archives, relinking, optional passphrase protection, and deliberate reauthorization on a new Mac.
 - Active-app and browser URL metadata only when a supported integration and permissions provide it; watched files alone do not establish those details.
 
 The command bar and annotation UI consume the same memory/search contract as the V1 MCP bridge. A full library dashboard is not a first-release prerequisite.

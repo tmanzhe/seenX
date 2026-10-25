@@ -25,6 +25,7 @@ The website uses authored samples and keyword matching. It does not read persona
 - A **SQLite catalog + FTS5 exact search + local vector retrieval**. Evaluate sqlite-vec against the existing exact-scan baseline before choosing the shipping vector index.
 - A lightweight ontology: explicit, typed relationships between images, regions, notes, collections, and sources. Inferred suggestions stay separate from user-confirmed facts.
 - An opt-in, read-only **MCP bridge in V1**, using the same search engine as the human interface.
+- Portable library backup/restore in V1: complete archives with originals or context-only exports, preserved notes/highlights/relationships, optional passphrase protection, and verified transfer to another Mac. Continuous sync is later scope.
 - An agent evaluation harness to test retrieving the right evidence. The connected client runs the agent; seenX supplies memory.
 
 Local storage and search are separate from sharing results: content returned to a cloud-backed assistant leaves the device. Active-app or URL capture needs a supported integration and permissions; it cannot reliably be inferred from a file appearing in a folder.
@@ -36,7 +37,10 @@ Local storage and search are separate from sharing results: content returned to 
 3. **Shared local engine contract:** import, annotate, search, fetch memory/region, export, remove, and indexing jobs.
 4. **Native capture and search:** SwiftUI/AppKit command bar, capture HUD, and platform adapters.
 5. **MCP and agent evaluations:** build alongside the native UI once shared contracts exist, not after a second release or a complete Rust rewrite.
-6. **Production handoff and beta:** gradually migrate proven behavior to Rust; verify model/runtime packaging, offline behavior, permissions, and distribution.
+6. **Portable library and restore:** versioned complete/context-only archives, relinking, optional encryption, and new-laptop restore checks; reconnect access deliberately.
+7. **Production handoff and beta:** gradually migrate proven behavior to Rust; verify model/runtime packaging, offline behavior, permissions, and distribution.
+
+Portable library transfer remains planned; the website currently exports single-memory JSON, not a backup of your real images or laptop.
 
 The complete milestones and completion criteria are in [the implementation plan](plan.md). [Architecture](docs/architecture.md) explains SQLite, vectors, the ontology, and component boundaries. PDFs/bookmarks as complete memory sources, automatic entity inference, team deployment, and a large organizing dashboard are later scope; existing PDF-reading experiments remain available.
 

@@ -78,7 +78,19 @@ MCP is a release capability, not a promise to build a general autonomous agent p
 
 **Done when:** one supported assistant finds the intended screenshot and fetches the correct highlight, note, and original evidence. Revoked records are inaccessible to future requests. Test prompts embedded in images/notes as untrusted data. The external client supplies the agent runtime.
 
-## 06 — Production migration and desktop beta · V1 release gate
+## 06 — Portable library backup and restore · V1 durability
+
+- Offer a deliberate Transfer my library flow for all or selected collections. This moves seenX-managed memories/context, not an entire operating-system installation.
+- Complete-library archives include selected image originals and their context. Context-only exports carry notes, selected text, coordinates, IDs/hashes, relationships, and source history; originals need to exist on or be relinked from the destination.
+- Preserve stable asset/revision identities, annotation targets, and typed relationships in a versioned manifest. Selected exports must not silently include unrelated private content to fill relationship edges.
+- Create a consistent snapshot. Validate content hashes and completeness before marking a backup successful. Indexes/thumbnails are optional derived data; reuse only compatible model/index revisions and rebuild the rest without losing annotations.
+- Offer optional passphrase-protected archives through a maintained authenticated-encryption format/library selected during implementation. Protect metadata as well as images. Do not depend solely on an old-Mac-only key; explain unrecoverable-passphrase behavior before use.
+- Exclude assistant credentials, tokens, active grants, and machine-specific source permissions. Reconnect external locations and authorize assistants on the destination.
+- Validate archive paths, schema versions, missing/corrupt files, and relation targets before importing. Restore to a fresh library or show an explicit merge/conflict preview. Never silently overwrite newer notes; a failed/canceled restore leaves existing data intact.
+
+**Done when:** export an annotated collection from one Mac, restore it into a fresh library on another, and verify image bytes, notes, selected text, aligned highlights, and relationships. Test context-only relinking, missing originals, duplicate IDs, schema migration, incompatible indexes, and encrypted-archive recovery. The website's single-memory JSON export does not implement these archive capabilities.
+
+## 07 — Production migration and desktop beta · V1 release gate
 
 - Gradually implement measured catalog, indexing, ranking, and access behavior in Rust behind the same contract.
 - Reuse Python datasets, model revisions, preprocessing, and result fixtures; record numeric tolerances and regression results.
@@ -87,11 +99,11 @@ MCP is a release capability, not a promise to build a general autonomous agent p
 - Verify offline operation after model downloads, migration/recovery, interrupted indexing, source removal, derived-index deletion, exports, access revocation, and resource use.
 - Complete signing/notarization, clean-machine installation, licensing, and the supported assistant setup.
 
-**Done when:** a clean Mac install completes the real capture-to-assistant loop. Release notes distinguish available behavior from later ideas. No dates are promised until these checks are demonstrated.
+**Done when:** a clean Mac install completes the real capture-to-assistant loop and verified library restore on a second Mac. Release notes distinguish available behavior from later ideas. No dates are promised until these checks are demonstrated.
 
 ## Later scope
 
-PDFs and bookmarks as complete annotated memory sources, additional app/browser capture integrations, richer organization, automatic entity/relationship suggestions, and team deployments. Existing PDF-reading experiments remain useful; they do not establish a finished PDF product. Add inference only when evaluation shows improvement over explicit relationships and hybrid search.
+Continuous multi-device sync, concurrent-note conflict handling, PDFs and bookmarks as complete annotated memory sources, additional app/browser capture integrations, richer organization, automatic entity/relationship suggestions, and team deployments. Existing PDF-reading experiments remain useful; they do not establish a finished PDF product. Add inference only when evaluation shows improvement over explicit relationships and hybrid search.
 
 ## Immediate next step
 

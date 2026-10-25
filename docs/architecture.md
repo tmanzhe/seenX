@@ -97,9 +97,23 @@ A SeenX-owned capture can snapshot the originating application before its overla
 
 Source permissions, capture permissions, and assistant collection grants are separate. The product does not require continuous recording, automatic file relocation, universal device access, or a heavy library dashboard.
 
+## Portable library contract · V1
+
+Backup/restore carries durable meaning across computers. A complete-library archive includes selected originals; a context-only export requires relinking the matching originals. Neither is a full laptop/OS migration tool.
+
+- Use a versioned manifest with stable asset/revision IDs, content hashes, normalized dimensions/coordinates, selected text, notes, collections, typed relationships, and source history.
+- Snapshot database records and referenced images consistently. Check completeness; retain evidence of missing originals instead of silently calling an incomplete export complete.
+- Preserve relationship closure or explicit unresolved references without adding unrelated private images to a selected export. Do not use absolute paths as portable identity.
+- Indexes and thumbnails are derived/optional. Check model/index versions before reuse and rebuild incompatible indexes without changing human notes or their source revisions.
+- Plan optional passphrase protection using a maintained authenticated-encryption library/format, including manifest and metadata protection. Avoid a transfer format that can be opened only with a key on the old machine. No archive encryption is implemented or audited today.
+- Exclude assistant credentials, tokens, active grants, and machine-specific permissions; reauthorize clients and reconnect external locations on the destination.
+- Validate archive paths, checksums, schemas, relation targets, missing assets, and duplicates before writing. Use a fresh-library restore or explicit merge preview, safe cancellation, and schema migration; never silently replace newer notes.
+
+The V1 release check restores the same annotated library onto a second Mac. Continuous multi-device sync is later scope with separate conflict/deletion semantics. The existing website exports a single sample record as JSON; it cannot produce or restore a complete library archive.
+
 ## Delivery sequence
 
-Follow [the implementation roadmap](../plan.md): durable memory/ontology → real OCR and hybrid vectors → shared local contract → native capture/search and MCP in parallel → measured Rust migration and release verification. Python remains the evaluation reference. No dates, completed security audit, encrypted catalog, signed Mac release, or universal assistant compatibility are claimed today.
+Follow [the implementation roadmap](../plan.md): durable memory/ontology → real OCR and hybrid vectors → shared local contract → native capture/search and MCP in parallel → portable-library restore → measured Rust migration and release verification. Python remains the evaluation reference. No dates, completed security audit, encrypted catalog, signed Mac release, or universal assistant compatibility are claimed today.
 
 ## Primary technical references
 

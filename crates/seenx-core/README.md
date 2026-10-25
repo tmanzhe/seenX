@@ -8,6 +8,7 @@
 - Lightweight ontology: typed relationships with source provenance and explicit assertion/confirmation state.
 - FTS5 exact retrieval plus local visual/text vector retrieval and evidence-preserving rank fusion. Evaluate sqlite-vec against exact scanning before selecting a shipping vector index.
 - Incremental indexing, model/index revisions, source reconciliation, derived-data deletion, recovery, and export.
+- Planned portable-library snapshots/manifests and validated restore, preserving IDs and annotations while excluding machine-specific credentials/grants.
 - One retrieval/authorization contract shared by native human search and the read-only V1 MCP bridge.
 
 Platform UI, screenshot capture, OS permissions, and native OCR/model adapters belong to the macOS boundary. Rust owns reusable memory and retrieval logic, not every platform API or model runtime implementation.

@@ -9,7 +9,7 @@ A Next.js App Router website for a local visual memory: saved images, the though
 - Whole-image notes, click-to-pin notes, drawn area annotations, and selectable authored text boxes. Saved highlights and notes are searchable.
 - A memory detail view with separate user notes, authored sample extracted text, and illustrative source labels.
 - Copy for assistant and JSON export include saved notes, selected text, full-image dimensions, normalized coordinates, and pixel bounds. Unsaved drafts must be saved or canceled before export.
-- Documentation for the native command bar, capture HUD, local retrieval, source metadata, and the V1 MCP plan.
+- Documentation for the native command bar, capture HUD, local retrieval, source metadata, V1 MCP, and portable-library backup/restore. Transfer and optional encrypted archives are planned; single-memory JSON export is the current preview capability.
 - The existing learning journal and its separate personal-notes notebook.
 - Static export; no real file access, upload endpoint, account service, semantic inference, or assistant connection.
 
