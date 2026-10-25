@@ -49,16 +49,38 @@ def print_summary(record: dict) -> None:
                 print(f"  Page {number}: no text extracted; OCR may be needed")
 
 
+def normalize_text(text: str) -> str:
+    """Ignore capitalization and differences in whitespace when matching."""
+    return " ".join(text.casefold().split())
+
+
+def search_pdf_text(records: list, query: str) -> list:
+    phrase = normalize_text(query)
+    if not phrase:
+        raise ValueError("Search phrase must contain non-whitespace characters")
+    matches = []
+    for record in records:
+        if record["kind"] != "pdf":
+            continue
+        for page in record["pages"]:
+            if phrase in normalize_text(page["text"]):
+                matches.append({"path": record["path"], "page": page["number"]})
+    return matches
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("folder", type=Path, help="Folder containing images and PDFs")
     parser.add_argument("--limit", type=int, default=10)
+    parser.add_argument("--query", help="Phrase to search for in extracted PDF text")
     args = parser.parse_args()
     folder = args.folder.expanduser().resolve()
     if not folder.is_dir():
         parser.error(f"Not a folder: {folder}")
     if args.limit < 1:
         parser.error("--limit must be positive")
+    if args.query is not None and not normalize_text(args.query):
+        parser.error("--query must contain non-whitespace characters")
 
     records = []
     extensions = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"}
@@ -83,6 +105,12 @@ def main() -> None:
     print(f"Loaded {len(records)} file(s).")
     if not records:
         parser.exit(1, "No supported, readable files found. Try PNG, JPEG, or PDF files.\n")
+    if args.query is not None:
+        matches = search_pdf_text(records, args.query)
+        print("PDF text search (images are not searched yet):")
+        for match in matches:
+            print(f"  {match['path']} — page {match['page']}")
+        print(f"Found {len(matches)} matching page(s).")
 
 
 if __name__ == "__main__":

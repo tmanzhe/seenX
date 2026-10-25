@@ -2,7 +2,7 @@
 
 We're building a local file-search prototype, one useful piece at a time. The idea is to find a screenshot, photo, or document using something you remember about it. Python lets us try the pieces and understand the results before deciding what belongs in the Rust desktop engine.
 
-Right now we can open images and PDFs, collect information about them, and display a summary. We haven't added OCR, embeddings, AI models, a database, or a Python web server. The Next.js website is a separate project under `apps/web`; this script isn't connected to it.
+Right now we can open images and PDFs, collect information about them, display a summary, and search extracted PDF text. We haven't added OCR, embeddings, AI models, a database, or a Python web server. The Next.js website is a separate project under `apps/web`; this script isn't connected to it.
 
 ## Get it running
 
@@ -136,6 +136,49 @@ terminal arguments → folder → choose reader → return dictionary
 
 The list only lives during the run. There is no persistent index yet, and PDF text consumes memory while retained. This is a small-folder experiment.
 
+### 4. Search the PDF text
+
+Now we can do something useful with those records. From `experiments`, with the environment activated:
+
+```sh
+python load_images.py ../practice-images --query "a phrase from your PDF"
+```
+
+Replace the quoted phrase with words you know appear in one of your documents. You'll see the usual file summaries followed by matching file paths and page numbers. We don't print document excerpts. A page appears once even if the phrase occurs several times. Zero matches is a normal result; an empty or whitespace-only query is an input error.
+
+The new `search_pdf_text(records, query)` function reads the records we already collected. It skips image records because we haven't extracted words from images yet. For each PDF page it asks:
+
+```python
+if phrase in normalize_text(page["text"]):
+    matches.append({"path": record["path"], "page": page["number"]})
+```
+
+`in` checks whether one string occurs inside another. This is a substring search: `train` also matches `trains`. We return a list of dictionaries, so the terminal is just one way to display results. We keep the file path and page number so you can find the source.
+
+Before comparing, we normalize both the query and the page text:
+
+```python
+return " ".join(text.casefold().split())
+```
+
+Read that from the inside out:
+
+1. `.casefold()` makes text suitable for comparisons that ignore capitalization, including Unicode cases beyond English.
+2. `.split()` with no arguments breaks the string into a list of pieces at whitespace. Repeated spaces, tabs, and line breaks become separators.
+3. `" ".join(...)` puts those pieces back together with one space between them.
+
+That lets `TRAIN BOOKING` match `Train` followed by a line break and `booking`. We don't remove punctuation, fix OCR mistakes, match synonyms, rank results, or join phrases across page boundaries. PDF extraction can also produce unexpected reading order. These are useful limits to understand before adding more sophisticated search.
+
+Every run reads the files again. `--limit` still applies to the combined image/PDF collection before searching, so use a larger limit if a desired PDF is later in filename order. The command prints a reminder that images aren't searched yet.
+
+We test the matching behavior with invented text dictionaries, not copies of personal documents or generated images:
+
+```sh
+python -m unittest discover -s . -p 'test_*.py' -v
+```
+
+The tests check capitalization, whitespace, Unicode matching, correct page references, multiple documents, missing matches, empty pages, and blank queries. They also check that a repeated phrase only returns its page once.
+
 ## Reading the rest of the script
 
 `main()` coordinates the work. Here's what its building blocks mean:
@@ -170,6 +213,13 @@ Start with **variables**, **strings and integers**, **functions and arguments**,
 
 For this latest step, search for:
 
+- `Python string in substring`: how we check whether a page contains the phrase.
+- `Python str casefold`: how we ignore capitalization.
+- `Python split join whitespace`: how we match across line breaks.
+- `Python unittest basics`: how we check behavior with repeatable examples.
+
+The previous step introduced:
+
 - `Python return values`: how a reader sends data back to its caller.
 - `Python dictionaries keys values`: how we name fields in a file record.
 - `Python lists append`: how we collect multiple records.
@@ -179,7 +229,7 @@ Other concepts already used are `Python pathlib`, `Python argparse beginner`, `P
 
 ## What comes next
 
-Next we'll search the extracted PDF text with a phrase and return matching filenames and page numbers. That gives us a small working search before adding AI. Then we can add OCR for screenshot text and image embeddings for visual descriptions. Each feature gets its own verification and Git commit, separate from frontend changes.
+We now have a small working PDF text search without AI. Next we'll add OCR so words visible in screenshots can participate in search too. Image embeddings come later for visual descriptions that don't depend on visible words. Each feature gets its own verification and Git commit, separate from frontend changes.
 
 Later, we'll compare keyword and semantic retrieval on labeled queries, and test whether relationships such as receipts belonging to trips improve results. Models may propose relationships; evidence and user confirmation need to stay distinguishable. We will measure useful behavior before moving it into the Rust engine. Python is our development reference, not a required runtime for the intended desktop release.
 

@@ -2,7 +2,7 @@
 
 A local-first image search application for macOS, designed to find screenshots and saved images using visible text and natural-language descriptions.
 
-**Status:** a Next.js product/docs site and dependency-free Rust library scaffold are available locally. Desktop indexing, search, and the native macOS app are not implemented yet.
+**Status:** a Next.js product/docs site, dependency-free Rust library scaffold, and Python file-reading/PDF keyword-search prototype are available. Desktop indexing, desktop search, and the native macOS app are not implemented yet. Start with the [Python walkthrough](experiments/README.md) to follow the current build step by step.
 
 Planned capabilities:
 
@@ -41,11 +41,11 @@ npm run build
 cargo check --offline --workspace
 ```
 
-The production web build is exported to `apps/web/out/`. The root npm workspace manages the website, and the Cargo workspace manages the Rust core. Xcode and Python environment setup are deferred.
+The production web build is exported to `apps/web/out/`. The root npm workspace manages the website, and the Cargo workspace manages the Rust core. Python has its own environment and setup instructions in the [experiments walkthrough](experiments/README.md). Xcode setup is deferred.
 
 ## Release direction
 
-The intended release is free and open source, supported by optional donations. The repository has not been published, no open-source license has been selected, and no donation destination is configured. There is no checkout or desktop download yet.
+The intended release is free and open source, supported by optional donations. The [repository is public on GitHub](https://github.com/tmanzhe/seenX), but no open-source license has been selected and no donation destination is configured. There is no checkout or desktop download yet.
 
 A read-only CLI or MCP adapter for self-hosted agents is a future possibility after local retrieval works.
 
