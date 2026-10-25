@@ -85,12 +85,14 @@ def search_text(records: list, query: str) -> list:
     return matches
 
 
-def read_folder(folder: Path, limit: int, ocr: bool, cache=None, refresh: bool = False) -> list:
+def read_folder(folder: Path, limit: int, ocr: bool, cache=None, refresh: bool = False,
+                paths: list | None = None) -> list:
     records = []
     reused = 0
     extensions = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"}
     # Sorting makes repeated runs process the same files in the same order.
-    for path in sorted(folder.iterdir()):
+    candidates = sorted(folder.iterdir()) if paths is None else paths
+    for path in candidates:
         suffix = path.suffix.lower()
         if not path.is_file() or (suffix not in extensions and suffix != ".pdf"):
             continue

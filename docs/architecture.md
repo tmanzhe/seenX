@@ -4,7 +4,7 @@
 
 Python learning and proof of concept → measured retrieval → local interface/API prototype → gradual Rust implementation → native macOS and agent interfaces.
 
-The website and Rust scaffold exist. Python supports image/PDF reading, local macOS OCR, keyword search, optional SQLite extraction caching, and a CLIP visual-search experiment. Desktop integration is pending.
+The website and Rust scaffold exist. Python supports image/PDF reading, local macOS OCR, keyword search, optional SQLite extraction caching, and CLIP visual search. A shared Python search function and command expose text, visual, and hybrid modes with source-method evidence. Desktop integration is pending.
 
 First make retrieval useful in Python. Then a local API, potentially FastAPI, can connect a local interface to the Python engine so we can try the whole workflow. There is no Python API server yet. The public product website remains separate: a hosted website can't simply read a user's local folders. We need a deliberate local integration before connecting it to personal files.
 

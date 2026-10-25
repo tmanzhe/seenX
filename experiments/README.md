@@ -2,7 +2,7 @@
 
 We're building a local file-search prototype, one useful piece at a time. The idea is to find a screenshot, photo, or document using something you remember about it. Python lets us try the pieces and understand the results before deciding what belongs in the Rust desktop engine.
 
-Right now we can read images and PDFs, recognize image text with optional local OCR, search that text, and retrieve images by visual description using CLIP embeddings. An optional SQLite cache lets us reuse extracted records and image vectors between runs. We haven't added a Python web server. Both OCR and visual search use pretrained models; we aren't training them. The Next.js website is a separate project under `apps/web`; these scripts aren't connected to it.
+Right now we can read images and PDFs, recognize image text with optional local OCR, search that text, and retrieve images by visual description using CLIP embeddings. `search_files.py` brings those approaches together in one command with text, visual, and hybrid modes. An optional SQLite cache lets us reuse extracted records and image vectors between runs. We haven't added a Python web server. Both OCR and visual search use pretrained models; we aren't training them. The Next.js website is a separate project under `apps/web`; these scripts aren't connected to it.
 
 ## Get it running
 
@@ -59,6 +59,7 @@ experiments/.venv/bin/python experiments/load_images.py practice-images
 | `image_ocr.py` | The small adapter between Python and Apple's Vision OCR framework. |
 | `record_cache.py` | Stores and retrieves extracted records with Python's built-in SQLite support. |
 | `visual_search.py` | A separate command for matching image contents against a text description. |
+| `search_files.py` | The combined search command and reusable search function. Start with step 8 to try all modes. |
 | `test_search.py`, `test_ocr.py`, `test_cache.py` | Repeatable checks for matching, OCR, and cache behavior. |
 | `pyproject.toml` | The Python version requirement and dependencies. |
 | `.venv/` | The interpreter and installed packages. Generated locally and ignored by Git. |
@@ -343,6 +344,84 @@ Initial verification used our eight practice images on macOS with Python 3.13.7,
 
 References: [CLIP model and processor documentation](https://huggingface.co/docs/transformers/v4.56.0/en/model_doc/clip), [pinned model revision](https://huggingface.co/openai/clip-vit-base-patch32/tree/c7244be81152024ce0e99ac8d2e373a8953d9f9a).
 
+### 8. Bring text and visual search into one command
+
+The two experiments worked independently. Next we wanted to ask one query, choose a search approach, and get results in one consistent shape. We added `search_files.py` to coordinate the existing readers rather than copying their implementation.
+
+From `experiments`, with the environment activated, text-only search works with the base dependencies:
+
+```sh
+python search_files.py ../practice-images --mode text --query "a phrase from your PDF" --cache
+```
+
+For visual search, install `.[visual]` as described in step 7 and download the pinned model once. Then:
+
+```sh
+python search_files.py ../practice-images --mode visual --query "a photo of a laptop computer" --cache
+```
+
+For the combined mode on macOS, install both optional groups and include OCR if you want screenshot words searched too:
+
+```sh
+python -m pip install -e ".[ocr,visual]"
+python search_files.py ../practice-images --mode hybrid --ocr --query "your phrase" --cache
+```
+
+`hybrid` is the default mode. Add `--download-model` to a visual or hybrid first run if the model hasn't been downloaded. Model loading is otherwise local-files-only. Text mode never loads CLIP. Visual mode never reads PDF text and rejects `--ocr` rather than silently ignoring it. Without `--ocr`, text matching covers extracted PDF text only. OCR dependencies are required whenever you request OCR.
+
+#### Select the same collection for both branches
+
+The new command first selects supported files in filename order, then passes that selection into both readers. `--limit 10` means at most ten candidate files, shared between the text and visual branches. A failed read consumes its candidate slot; we don't silently replace it with a different file in one branch. This differs from the original experiment commands, whose limits count successful reads.
+
+In text and hybrid modes, PDFs and images both count toward this limit. In visual mode, only images are candidates. We still don't enter subfolders. Use a larger limit to include more files. A hybrid selection containing only PDFs skips model loading and searches their text; an actual model-loading error with selected images is reported rather than quietly changing the search mode.
+
+#### How the results are combined
+
+An OCR match and a cosine similarity score measure different things, so we don't add those raw scores together. We use a small **reciprocal rank fusion** baseline. Each branch contributes according to rank rather than the original score:
+
+```text
+contribution = 1 / (60 + rank)
+```
+
+Our exact phrase matcher doesn't distinguish one matching page as more relevant than another, so every exact match is tied at rank 1. Visual results have their usual similarity ranks. An image that appears in both branches receives both contributions:
+
+```text
+Exact phrase match: 1 / 61
+Visual rank 2:     1 / 62
+Combined score:   about 0.03252
+```
+
+The constant 60 smooths the differences between nearby ranks. This is a starting choice, not a value we've tuned on your files. The tied keyword treatment is our adaptation for a boolean phrase matcher; we aren't using BM25 or claiming a complete full-text ranking system. See [Microsoft's explanation of reciprocal rank fusion](https://learn.microsoft.com/en-us/azure/search/hybrid-search-ranking) for the general idea. Our implementation is entirely local and doesn't use Azure.
+
+We combine all selected candidates before returning `--top-k` results. Returning only five visual candidates before fusion could miss an image whose text match should lift it into the final five.
+
+**Deduplication** means keeping one result for the same image even when both branches find it. We use `(path, page)` as the identity: a tuple containing the source path and page number. For an image, `page` is `None`. PDF pages remain separate results because page 1 and page 2 are different locations. Duplicate entries from a single branch don't earn additional score.
+
+After fusion we sort by score, then evidence count, then path and page to make ties repeatable. A result's dictionary contains:
+
+```python
+{
+    "path": "/photos/example.jpg",
+    "page": None,
+    "score": 0.03252,
+    "score_kind": "rank-fusion",
+    "evidence": [
+        {"method": "image-ocr", "rank": 1},
+        {"method": "clip-visual", "rank": 2, "cosine": 0.24},
+    ],
+}
+```
+
+These numbers are illustrative. `evidence` explains why a result was retrieved; a visual suggestion isn't a confirmed object label, and an OCR match can still come from a recognition error. The terminal prints the method names without printing extracted contents.
+
+Text mode labels its score `exact-match`; visual mode labels it `cosine`; hybrid labels it `rank-fusion`. These score types aren't interchangeable and none are calibrated probabilities. Visual-only candidates can still appear when there is no exact match, including for queries unrelated to the collection. There is no no-match threshold yet. Use text mode when you want only literal phrase matches.
+
+The `search_files()` function returns a list of result dictionaries. The terminal entry point displays them. This gives us a shared retrieval interface for later experiments and a local API, but the current readers also print progress; we haven't built a server or finalized an API contract yet.
+
+Tests check merging both sources, tied text ranks, duplicate suppression, separate PDF pages, limits, mode isolation, and a shared candidate pool. Model loading is mocked in orchestration tests so they run without downloads. These tests establish consistent behavior; labeled queries are still needed to learn whether fusion improves relevance.
+
+Initial verification passed all 31 tests. On the practice folder, the offline hybrid laptop query reused nine text records and eight image embeddings and ranked the laptop image first. A second real-data check used a recognized word from an image and verified that the image appeared once with both OCR and visual methods attached. Text-only retrieval was also checked without loading CLIP. These are behavior checks, not a relevance benchmark.
+
 ## Reading the rest of the script
 
 `main()` coordinates the work. Here's what its building blocks mean:
@@ -376,6 +455,14 @@ Supported images are JPEG, PNG, WebP, BMP, and TIFF. HEIC isn't supported yet. U
 Start with **variables**, **strings and integers**, **functions and arguments**, **indentation**, **conditions**, and **loops**. You don't need to master everything before continuing.
 
 For this latest step, search for:
+
+- `Python tuple dictionary keys`: how `(path, page)` identifies a result.
+- `Python sets membership`: how we avoid counting the same visual result twice.
+- `Python dictionary values`: how merged records become a result list.
+- `Python sorted tuple key`: how multiple sorting criteria break ties.
+- `reciprocal rank fusion`: why we combine ranks rather than raw scores.
+
+The visual-search step introduced:
 
 - `machine learning inference vs training`: why we can use a model without training one.
 - `image text embeddings CLIP`: why images and descriptions can be compared.
@@ -420,7 +507,7 @@ Other concepts already used are `Python pathlib`, `Python argparse beginner`, `P
 
 ## What comes next
 
-We now have exact text search and a separate visual-search baseline. Next we'll label expected results for a small set of queries and compare retrieval quality before combining the two approaches. OCR for scanned PDFs is another separate step. Each feature gets its own verification and Git commit, separate from frontend changes.
+We now have one command with text, visual, and hybrid modes. Next we'll label expected results for a small set of queries and compare the modes before tuning ranking or connecting a local interface. OCR for scanned PDFs is another separate step. Each feature gets its own verification and Git commit, separate from frontend changes.
 
 The broader path is Python engine → useful retrieval → local interface/API → gradual Rust migration. A small FastAPI service could later keep the Python model loaded and expose stable result shapes to a local frontend. There is no API server yet, and the public website doesn't have access to your folders. We can replace individual engine responsibilities with Rust after comparing their outputs against the Python reference. The intended shipped desktop app should work without a Python interpreter.
 

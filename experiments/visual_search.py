@@ -83,10 +83,12 @@ class ClipEncoder:
         return normalize_vector(features[0].tolist())
 
 
-def collect_embeddings(folder: Path, encoder, limit: int, cache=None) -> list:
+def collect_embeddings(folder: Path, encoder, limit: int, cache=None,
+                       paths: list | None = None) -> list:
     records = []
     reused = 0
-    for path in sorted(folder.iterdir()):
+    candidates = sorted(folder.iterdir()) if paths is None else paths
+    for path in candidates:
         if not path.is_file() or path.suffix.lower() not in EXTENSIONS:
             continue
         try:
