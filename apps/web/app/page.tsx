@@ -1,21 +1,24 @@
 import Link from "next/link";
 import { Icon } from "../components/icon";
 import { SearchDemo } from "../components/search-demo";
-import { MemoryMotion } from "../components/memory-motion";
+import { AsciiMemory } from "../components/ascii-memory";
 import { UseCases } from "../components/use-cases";
 
 export default function Home() {
   return (
-    <main id="main">
-      <section className="hero">
-        <div className="hero-eyebrow"><span className="status-dot" /> YOUR VISUAL MEMORY, CLOSE AT HAND.</div>
-        <h1>You’ve seen it.<br />Find it <em>again.</em></h1>
-        <p className="hero-description">The screenshot. The place. That one thing you saved.<br className="desktop-break" /> Visual memory for you—and the AI agents you build.</p>
+    <main id="main" className="landing-page">
+      <section className="hero hero-editorial">
+        <AsciiMemory />
+        <div className="hero-copy">
+        <div className="hero-eyebrow"><span className="status-dot" /> [ A LOCAL VISUAL MEMORY ]</div>
+        <h1>Everything you saved.<br />Back in <em>context.</em></h1>
+        <p className="hero-description">Find screenshots and visual references by what you remember. Give your agents a way to find them, too.</p>
         <div className="hero-actions"><a href="#demo" className="button button-orange">Explore the preview <Icon name="arrow" size={17} /></a><Link href="/docs" className="text-link">See what we’re building <Icon name="diagonal" size={15} /></Link></div>
         <div className="hero-footnote"><Icon name="monitor" size={14} /> Local engine first <span>·</span> Free, with optional support <span>·</span> In development</div>
-        <MemoryMotion />
+        </div>
+        <div className="hero-baseline"><span>[ 01 / REMEMBER ]</span><span>Selected folders. Local processing. Your context.</span><a href="#demo">Explore below ↓</a></div>
       </section>
-      <div className="demo-section"><SearchDemo /></div>
+      <div className="demo-section"><div className="landing-section-label"><span>[ THE PREVIEW ]</span><span>Sample library · no access to your files</span></div><SearchDemo /></div>
 
       <UseCases />
 
@@ -24,7 +27,7 @@ export default function Home() {
         <div className="local-visual" aria-label="Concept diagram showing selected folders connecting to a local index"><span className="diagram-caption">THE INTENDED FLOW</span><div className="folder-stack"><div><Icon name="folder" /><span>Screenshots</span></div><div><Icon name="folder" /><span>Little adventures</span></div><div><Icon name="folder" /><span>Things worth keeping</span></div></div><div className="connection-line" /><div className="index-node"><span className="brand-symbol" aria-hidden="true"><i /><i /><i /><i /></span><div>seenX index<span>Words + meaning + metadata</span></div><Icon name="lock" size={18} /></div><div className="device-boundary"><Icon name="monitor" size={15} /> This boundary is your Mac.</div></div>
       </section>
 
-      <section className="project-checkpoint section-container" aria-labelledby="project-status"><div><span className="eyebrow">THE PROJECT</span><h2 id="project-status">A working idea.<br />Built in the open.</h2><p>The preview is available now. Personal indexing and agent access are in development. Free and open source is the intended release direction.</p></div><div className="project-links"><Link href="/docs/roadmap">Roadmap <Icon name="arrow" size={16} /></Link><Link href="/learning">Learning & experiments <Icon name="arrow" size={16} /></Link><Link href="/support">Support the project <Icon name="heart" size={16} /></Link></div></section>
+      <section className="project-checkpoint section-container" aria-labelledby="project-status"><div><span className="eyebrow">THE PROJECT</span><h2 id="project-status">From experiment<br />to everyday use.</h2><p>The preview is available now. Personal indexing and agent access are in development. Free and open source is the intended release direction.</p></div><div className="project-links"><Link href="/docs/roadmap">Roadmap <Icon name="arrow" size={16} /></Link><Link href="/learning">Learning & experiments <Icon name="arrow" size={16} /></Link><Link href="/support">Support the project <Icon name="heart" size={16} /></Link></div></section>
 
       <section className="faq-section section-container"><div><span className="eyebrow">A FEW GOOD QUESTIONS</span><h2>Before you ask.</h2></div><div className="faq-list">{[
         ["Does the preview search my own files?", "No. It searches authored sample records in your browser. It does not access your folders or run an AI model."],
