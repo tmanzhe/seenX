@@ -7,7 +7,8 @@ import sqlite3
 from image_ocr import check_ocr_available
 from load_images import normalize_text, read_folder, search_text
 from record_cache import open_cache
-from visual_search import ClipEncoder, EXTENSIONS, collect_embeddings, rank_images
+from visual_search import (ClipEncoder, DEFAULT_MIN_SCORE, EXTENSIONS,
+                           collect_embeddings, filter_visual_matches, rank_images)
 
 FUSION_SMOOTHING = 60
 
@@ -61,7 +62,8 @@ def select_paths(folder: Path, mode: str, limit: int) -> list:
 
 def search_files(folder: Path, query: str, mode: str = "hybrid", ocr: bool = False,
                  limit: int = 10, top_k: int = 5, cache=None,
-                 download: bool = False, encoder=None) -> list:
+                 download: bool = False, encoder=None,
+                 min_score: float = DEFAULT_MIN_SCORE) -> list:
     folder = folder.expanduser().resolve()
     if not folder.is_dir():
         raise ValueError(f"Not a folder: {folder}")
@@ -69,6 +71,7 @@ def search_files(folder: Path, query: str, mode: str = "hybrid", ocr: bool = Fal
         raise ValueError("Mode must be text, visual, or hybrid")
     if not normalize_text(query) or limit < 1 or top_k < 1:
         raise ValueError("Query must not be blank; limit and top_k must be positive")
+    filter_visual_matches([], min_score)
     if mode == "visual" and ocr:
         raise ValueError("--ocr is for text and hybrid modes")
     if mode == "text" and download:
@@ -76,7 +79,7 @@ def search_files(folder: Path, query: str, mode: str = "hybrid", ocr: bool = Fal
     paths = select_paths(folder, mode, limit)
     if not paths:
         raise ValueError("No supported files in the selected folder")
-    print(f"Mode: {mode}; selected {len(paths)} file(s).")
+    print(f"Scanning {len(paths)} candidate file(s); mode={mode}. These are not result counts.")
     text_matches = []
     visual_matches = []
     readable = False
@@ -85,7 +88,7 @@ def search_files(folder: Path, query: str, mode: str = "hybrid", ocr: bool = Fal
             check_ocr_available()
         else:
             print("Image text is excluded; add --ocr to recognize it.")
-        records = read_folder(folder, len(paths), ocr, cache, paths=paths)
+        records = read_folder(folder, len(paths), ocr, cache, paths=paths, show_summaries=False)
         readable = bool(records)
         text_matches = search_text(records, query)
     if mode in {"visual", "hybrid"}:
@@ -98,7 +101,9 @@ def search_files(folder: Path, query: str, mode: str = "hybrid", ocr: bool = Fal
             readable = readable or bool(vectors)
             if vectors:
                 # Fuse all candidates before applying the final result limit.
-                visual_matches = rank_images(vectors, encoder.encode_text(query), len(vectors))
+                ranked = rank_images(vectors, encoder.encode_text(query), len(vectors))
+                visual_matches = filter_visual_matches(ranked, min_score)
+                print(f"Visual cutoff {min_score:g}: kept {len(visual_matches)} of {len(ranked)} candidate image(s).")
         else:
             print("No images selected for the visual branch; searching PDF text only.")
     if not readable:
@@ -116,6 +121,8 @@ def main() -> None:
     parser.add_argument("--download-model", action="store_true")
     parser.add_argument("--limit", type=int, default=10, help="Maximum candidate files, shared across branches")
     parser.add_argument("--top-k", type=int, default=5)
+    parser.add_argument("--min-score", type=float, default=DEFAULT_MIN_SCORE,
+                        help="Minimum visual cosine before fusion (default: 0.25); does not filter exact text matches")
     args = parser.parse_args()
     cache_path = Path(__file__).resolve().parent / ".cache" / "records.sqlite3" if args.cache else None
     try:
@@ -123,7 +130,7 @@ def main() -> None:
             results = search_files(
                 args.folder, args.query, mode=args.mode, ocr=args.ocr,
                 limit=args.limit, top_k=args.top_k, cache=cache,
-                download=args.download_model,
+                download=args.download_model, min_score=args.min_score,
             )
     except (ValueError, RuntimeError, ImportError, OSError, sqlite3.Error) as error:
         parser.exit(1, f"Search failed: {error}\n")

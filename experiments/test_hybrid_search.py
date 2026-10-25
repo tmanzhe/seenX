@@ -2,6 +2,7 @@
 
 from contextlib import redirect_stdout
 from io import StringIO
+import math
 from pathlib import Path
 import tempfile
 import unittest
@@ -78,7 +79,35 @@ class SearchFlowTests(unittest.TestCase):
         self.assertEqual(reader.call_args.kwargs["paths"],
                          [self.folder / "a.pdf", self.folder / "b.jpg"])
         self.assertEqual(collect.call_args.kwargs["paths"], [self.folder / "b.jpg"])
+        self.assertFalse(reader.call_args.kwargs["show_summaries"])
         self.assertEqual(len(results), 2)
+
+    def test_weak_visual_candidates_are_filtered_before_fusion(self):
+        encoder = Mock()
+        encoder.encode_text.return_value = [1, 0]
+        vectors = [
+            {"path": str(self.folder / "b.jpg"), "embedding": [0.3, math.sqrt(1 - 0.3 ** 2)]},
+            {"path": str(self.folder / "c.jpg"), "embedding": [0.2, math.sqrt(1 - 0.2 ** 2)]},
+        ]
+        with redirect_stdout(StringIO()), patch("search_files.read_folder", return_value=self.text):
+            with patch("search_files.collect_embeddings", return_value=vectors):
+                results = search_files(self.folder, "booking", encoder=encoder)
+                strict = search_files(self.folder, "booking", encoder=encoder, min_score=0.5)
+        self.assertEqual({Path(result["path"]).name for result in results}, {"a.pdf", "b.jpg"})
+        self.assertEqual(len(strict), 1)
+        self.assertEqual(strict[0]["evidence"][0]["method"], "pdf-text")
+
+    def test_rejected_visual_evidence_does_not_remove_an_exact_ocr_match(self):
+        encoder = Mock()
+        encoder.encode_text.return_value = [1, 0]
+        image_path = str(self.folder / "b.jpg")
+        text = [{"path": image_path, "kind": "image", "text": "booking"}]
+        vectors = [{"path": image_path, "embedding": [0, 1]}]
+        with redirect_stdout(StringIO()), patch("search_files.read_folder", return_value=text):
+            with patch("search_files.collect_embeddings", return_value=vectors):
+                results = search_files(self.folder, "booking", encoder=encoder)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["evidence"], [{"method": "image-ocr", "rank": 1}])
 
     def test_text_mode_does_not_load_clip(self):
         with redirect_stdout(StringIO()), patch("search_files.read_folder", return_value=self.text):
@@ -105,7 +134,8 @@ class SearchFlowTests(unittest.TestCase):
         self.assertEqual(select_paths(self.folder, "visual", 1), [self.folder / "b.jpg"])
 
     def test_invalid_options_and_unreadable_collection(self):
-        for options in ({"query": " "}, {"limit": 0}, {"mode": "visual", "ocr": True},
+        for options in ({"query": " "}, {"limit": 0}, {"min_score": math.nan},
+                        {"mode": "visual", "ocr": True},
                         {"mode": "text", "download": True}):
             arguments = {"query": "booking", **options}
             with self.subTest(options=options), self.assertRaises(ValueError):

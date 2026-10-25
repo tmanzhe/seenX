@@ -86,7 +86,7 @@ def search_text(records: list, query: str) -> list:
 
 
 def read_folder(folder: Path, limit: int, ocr: bool, cache=None, refresh: bool = False,
-                paths: list | None = None) -> list:
+                paths: list | None = None, show_summaries: bool = True) -> list:
     records = []
     reused = 0
     extensions = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"}
@@ -112,7 +112,10 @@ def read_folder(folder: Path, limit: int, ocr: bool, cache=None, refresh: bool =
                     raise OSError("File changed during reading; retry on the next run")
                 save_record(cache, path, key, state, record)
             records.append(record)
-            print_summary(record)
+            if show_summaries:
+                print_summary(record)
+            elif "ocr_error" in record:
+                print(f"OCR failed for {path.name}: {record['ocr_error']}")
         except (UnidentifiedImageError, OSError, Image.DecompressionBombError,
                 PyPdfError, ValueError, NotImplementedError) as error:
             print(f"Skipped {path.name}: {error}")

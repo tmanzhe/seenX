@@ -296,7 +296,7 @@ python visual_search.py ../practice-images --query "a photo of a cat" --cache
 
 The default is local-files-only model loading. If the model isn't downloaded, the command fails with instructions rather than silently downloading it. `--download-model` permits fetching missing model files; it doesn't upload the input collection. You can additionally set `HF_HUB_OFFLINE=1` and `TRANSFORMERS_OFFLINE=1` when checking an offline run.
 
-The command considers up to ten readable images in filename order and returns the top five. Change these with `--limit 100 --top-k 5`. It doesn't search PDFs or run OCR. PDF text search stays in the existing command. For now, each command is a separate experiment.
+The command considers up to ten readable images in filename order and returns up to five that pass the visual cutoff. Change the limits with `--limit 100 --top-k 5`, and the cutoff with `--min-score 0.25`. It doesn't search PDFs or run OCR. PDF text search stays in the existing command. For now, each command is a separate experiment.
 
 #### What the model does
 
@@ -328,7 +328,7 @@ We first normalize each vector to length one. For a small example, `[3, 4]` has 
 
 Then we multiply corresponding elements of the query and image vectors and add those products. That is a **dot product**. For unit-length vectors, it is also their **cosine similarity**. We sort the images from highest score to lowest and return at most `--top-k` results. Tied scores use file-path order for repeatability.
 
-The output includes scores and paths, not captions or automatically confirmed labels. A score isn't a probability that an image contains the object. Something ranks first even if the folder contains no cats. There is no calibrated no-match threshold yet. Try a description that matches an image you actually added, then compare unrelated descriptions and inspect the rankings.
+The output includes scores and paths, not captions or automatically confirmed labels. A score isn't a probability that an image contains the object. Something ranks first even if the folder contains no cats, so ranking alone isn't enough to decide what to return. The command now rejects visual scores below `--min-score` (default `0.25`) and can return zero matches. This is a configurable starting heuristic, not a broadly calibrated object-presence test. Step 9 explains why we added it and the remaining tradeoffs.
 
 The `ClipEncoder` class keeps the model, processor, and library together in one object. `__init__` initializes that object, `self.model` stores its model, and its `encode_image()` and `encode_text()` methods use the same configuration. This is our first application class; you don't need classes to understand the earlier dictionary-based readers.
 
@@ -393,7 +393,7 @@ Combined score:   about 0.03252
 
 The constant 60 smooths the differences between nearby ranks. This is a starting choice, not a value we've tuned on your files. The tied keyword treatment is our adaptation for a boolean phrase matcher; we aren't using BM25 or claiming a complete full-text ranking system. See [Microsoft's explanation of reciprocal rank fusion](https://learn.microsoft.com/en-us/azure/search/hybrid-search-ranking) for the general idea. Our implementation is entirely local and doesn't use Azure.
 
-We combine all selected candidates before returning `--top-k` results. Returning only five visual candidates before fusion could miss an image whose text match should lift it into the final five.
+We apply the visual cutoff, combine the surviving visual candidates with exact text matches, then return at most `--top-k` results. Returning only five visual candidates before fusion could miss an image whose text match should lift it into the final five. A low visual score doesn't remove a genuine text-branch match; it simply contributes no visual evidence.
 
 **Deduplication** means keeping one result for the same image even when both branches find it. We use `(path, page)` as the identity: a tuple containing the source path and page number. For an image, `page` is `None`. PDF pages remain separate results because page 1 and page 2 are different locations. Duplicate entries from a single branch don't earn additional score.
 
@@ -414,13 +414,52 @@ After fusion we sort by score, then evidence count, then path and page to make t
 
 These numbers are illustrative. `evidence` explains why a result was retrieved; a visual suggestion isn't a confirmed object label, and an OCR match can still come from a recognition error. The terminal prints the method names without printing extracted contents.
 
-Text mode labels its score `exact-match`; visual mode labels it `cosine`; hybrid labels it `rank-fusion`. These score types aren't interchangeable and none are calibrated probabilities. Visual-only candidates can still appear when there is no exact match, including for queries unrelated to the collection. There is no no-match threshold yet. Use text mode when you want only literal phrase matches.
+Text mode labels its score `exact-match`; visual mode labels it `cosine`; hybrid labels it `rank-fusion`. These score types aren't interchangeable and none are calibrated probabilities. Visual candidates must pass the cosine cutoff before fusion; comparing the final fusion score with a cosine threshold would be incorrect. An unrelated image can still exceed the heuristic cutoff, so use text mode when you want only literal phrase matches.
 
 The `search_files()` function returns a list of result dictionaries. The terminal entry point displays them. This gives us a shared retrieval interface for later experiments and a local API, but the current readers also print progress; we haven't built a server or finalized an API contract yet.
 
 Tests check merging both sources, tied text ranks, duplicate suppression, separate PDF pages, limits, mode isolation, and a shared candidate pool. Model loading is mocked in orchestration tests so they run without downloads. These tests establish consistent behavior; labeled queries are still needed to learn whether fusion improves relevance.
 
 Initial verification passed all 31 tests. On the practice folder, the offline hybrid laptop query reused nine text records and eight image embeddings and ranked the laptop image first. A second real-data check used a recognized word from an image and verified that the image appeared once with both OCR and visual methods attached. Text-only retrieval was also checked without loading CLIP. These are behavior checks, not a relevance benchmark.
+
+### 9. Stop filling the result list with weak matches
+
+Trying real queries exposed a mistake in our first visual-search behavior. Searching for a laptop returned five pictures even though the folder only had one relevant laptop image. We had built a ranking and treated its highest entries as matches. Every image gets a similarity score, including unrelated ones, so a fixed top-five list kept filling the remaining slots.
+
+We separated **ranking** from **acceptance**. `rank_images()` still orders the candidates. `filter_visual_matches()` rejects scores below a minimum. Only then do we apply hybrid fusion and the final result limit. `--top-k 5` now means at most five accepted results; it doesn't mean the program must find five.
+
+Both commands use the same default minimum cosine score of `0.25`:
+
+```sh
+python visual_search.py ../practice-images --query "basketball" --cache
+python search_files.py ../practice-images --mode hybrid --ocr --query "a laptop" --cache
+```
+
+We inspected the actual similarities before choosing that starting point:
+
+| Query | Best image | Next image | Matches at 0.25 |
+| --- | --- | --- | --- |
+| `basketball` | 0.2906 | 0.2332 | 1 |
+| `a laptop` | 0.2844 | 0.2398 | 1 |
+| `a submarine underwater` | 0.2087 | 0.2068 | 0 |
+
+The first two best images were visually checked against the queries. These few queries help reproduce the reported problem; they aren't enough to calibrate a universal threshold. A different collection, query wording, or model can need a different cutoff.
+
+To require stronger similarity:
+
+```sh
+python search_files.py ../practice-images --mode visual --query "a laptop" --cache --min-score 0.28
+```
+
+Raising the cutoff usually removes more weak results but can also hide relevant images. Lowering it retrieves more candidates but can show more unrelated images. In retrieval terms, that's a **precision/recall tradeoff**: precision asks how many returned results are relevant; recall asks how many relevant items we found. We need more labeled positive and negative queries to measure both.
+
+For an explicit raw-ranking experiment, `--min-score -1` allows all cosine scores through. This is useful for inspecting failures, not our default search behavior. Valid cutoffs are finite values between -1 and 1. A value of `0.25` does not mean 25% confidence.
+
+In hybrid mode, exact text matches don't need to pass the visual cutoff. For example, an OCR match can remain even when the image is visually dissimilar. Its result will show text evidence alone. We never use the much smaller rank-fusion score as though it were a cosine similarity.
+
+The combined search command also stopped printing a metadata summary for every scanned file. It now distinguishes candidate counts and cache statistics from the final `Found ... result(s)` count. The original learning command still prints metadata so you can inspect file reading. OCR failures are reported even when normal metadata summaries are hidden.
+
+Regression checks cover the basketball/laptop score examples, zero matches, multiple accepted matches, inclusive cutoff boundaries, invalid thresholds, filtering before fusion, and preserving text-only evidence. The suite passed 36 tests, and real offline hybrid runs returned one basketball result, one laptop result, and zero submarine results. Multiple images may still be returned when they pass the cutoff; we haven't hardcoded a single result or special query words.
 
 ## Reading the rest of the script
 
@@ -455,6 +494,13 @@ Supported images are JPEG, PNG, WebP, BMP, and TIFF. HEIC isn't supported yet. U
 Start with **variables**, **strings and integers**, **functions and arguments**, **indentation**, **conditions**, and **loops**. You don't need to master everything before continuing.
 
 For this latest step, search for:
+
+- `information retrieval precision recall`: how to measure unwanted results and missed results.
+- `similarity threshold vs top k`: why nearest results aren't necessarily relevant matches.
+- `Python math isfinite`: rejecting `NaN` and infinite cutoff values.
+- `Python list comprehension if filter`: keeping only scores that pass a condition.
+
+The hybrid-search step introduced:
 
 - `Python tuple dictionary keys`: how `(path, page)` identifies a result.
 - `Python sets membership`: how we avoid counting the same visual result twice.

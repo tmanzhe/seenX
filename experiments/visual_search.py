@@ -17,6 +17,14 @@ MODEL_ID = "openai/clip-vit-base-patch32"
 MODEL_REVISION = "c7244be81152024ce0e99ac8d2e373a8953d9f9a"
 MODEL_CACHE = Path(__file__).resolve().parent.parent / "models" / "huggingface"
 EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff"}
+DEFAULT_MIN_SCORE = 0.25
+
+
+def filter_visual_matches(matches: list, min_score: float = DEFAULT_MIN_SCORE) -> list:
+    """Reject weak similarities; this cutoff is a heuristic, not confidence."""
+    if not math.isfinite(min_score) or not -1 <= min_score <= 1:
+        raise ValueError("--min-score must be a finite cosine score between -1 and 1")
+    return [match for match in matches if match["score"] >= min_score]
 
 
 def normalize_vector(values: list) -> list:
@@ -120,6 +128,8 @@ def main() -> None:
     parser.add_argument("--query", required=True, help="Visual description, e.g. a photo of a cat")
     parser.add_argument("--limit", type=int, default=10, help="Maximum readable images to index")
     parser.add_argument("--top-k", type=int, default=5, help="Maximum results to return")
+    parser.add_argument("--min-score", type=float, default=DEFAULT_MIN_SCORE,
+                        help="Minimum visual cosine similarity (default: 0.25; not a probability)")
     parser.add_argument("--cache", action="store_true", help="Save and reuse image embeddings locally")
     parser.add_argument("--download-model", action="store_true", help="Allow downloading pinned model files (otherwise offline)")
     args = parser.parse_args()
@@ -130,6 +140,10 @@ def main() -> None:
         parser.error("--query must contain non-whitespace characters")
     if args.limit < 1 or args.top_k < 1:
         parser.error("--limit and --top-k must be positive")
+    try:
+        filter_visual_matches([], args.min_score)
+    except ValueError as error:
+        parser.error(str(error))
     if not any(path.is_file() and path.suffix.lower() in EXTENSIONS for path in folder.iterdir()):
         parser.error("No supported image files found; PDFs are not searched by this command")
 
@@ -145,14 +159,18 @@ def main() -> None:
         if not records:
             parser.exit(1, "No readable images were indexed.\n")
         query_vector = encoder.encode_text(args.query)
-        results = rank_images(records, query_vector, args.top_k)
+        ranked = rank_images(records, query_vector, len(records))
+        results = filter_visual_matches(ranked, args.min_score)[:args.top_k]
         searched = perf_counter()
     except (ImportError, OSError, RuntimeError, ValueError, sqlite3.Error) as error:
         parser.exit(1, f"Visual search failed: {error}\nFor a first run, install .[visual] and use --download-model.\n")
 
-    print("Closest images by cosine similarity (scores are not probabilities):")
+    print(f"Visual matches with cosine >= {args.min_score:g} (scores are not probabilities):")
     for number, result in enumerate(results, start=1):
         print(f"  {number}. {result['score']:.4f}  {result['path']}")
+    print(f"Found {len(results)} visual match(es); --top-k is a maximum, not a target.")
+    if not results:
+        print("No images met the visual cutoff.")
     print(f"Seconds: model load {loaded - started:.3f}; indexing {indexed - loaded:.3f}; query {searched - indexed:.3f}")
 
 
