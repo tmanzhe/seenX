@@ -1,0 +1,92 @@
+"use client";
+
+import { useEffect } from "react";
+
+export function LandingMotion() {
+  useEffect(() => {
+    const root = document.querySelector<HTMLElement>(".landing-page");
+    if (!root) return;
+    const preference = matchMedia("(prefers-reduced-motion: reduce)");
+    let dispose = () => {};
+
+    function setup() {
+      dispose();
+      if (!root || preference.matches) return;
+      const animations = new Set<Animation>();
+      const seen = new WeakSet<Element>();
+      let entrance = 0;
+      const reveal = (element: Element, delay = 0) => {
+        if (seen.has(element)) return;
+        seen.add(element);
+        // Content stays visible if JavaScript or an animation fails.
+        const offsets = [[0, 8], [-7, 3], [7, 3], [0, 0], [0, -5]];
+        const [x, y] = offsets[entrance++ % offsets.length];
+        const animation = element.animate([
+          { opacity: 0, transform: `translate(${x}px, ${y}px)` },
+          { opacity: 1, transform: "translate(0, 0)" },
+        ], { duration: 460, delay, easing: "cubic-bezier(.2,.7,.3,1)", fill: "backwards" });
+        animations.add(animation);
+        animation.onfinish = () => animations.delete(animation);
+      };
+      const observer = new IntersectionObserver((entries) => {
+        const visible = entries.filter((entry) => entry.isIntersecting);
+        visible.forEach((entry, index) => {
+          reveal(entry.target, Math.min(index * 45, 135));
+          observer.unobserve(entry.target);
+        });
+      }, { threshold: 0.08, rootMargin: "0px 0px -24px 0px" });
+      const observe = () => root.querySelectorAll(".hero-copy > *, .desktop-window, .image-card, .section-intro > *, .audience-tabs, .use-case-grid article, .use-case-bottom, .local-copy > *, .folder-stack > div, .index-node, .device-boundary, .faq-section > div:first-child, .faq-list details").forEach((element) => {
+        if (!seen.has(element)) observer.observe(element);
+      });
+      observe();
+      // New search results and tab content receive the same entrance treatment.
+      const mutations = new MutationObserver(observe);
+      root.querySelectorAll(".image-grid, #audience-panel").forEach((element) => {
+        mutations.observe(element, { childList: true, subtree: true });
+      });
+
+      const hero = root.querySelector<HTMLElement>(".hero-editorial");
+      const diagram = root.querySelector<HTMLElement>(".local-visual");
+      let frame = 0;
+      const update = () => {
+        frame = 0;
+        const height = document.documentElement.scrollHeight - innerHeight;
+        root.style.setProperty("--page-progress", String(height > 0 ? Math.min(1, Math.max(0, scrollY / height)) : 0));
+        if (hero) {
+          const distance = Math.max(0, -hero.getBoundingClientRect().top);
+          hero.style.setProperty("--hero-drift", `${Math.min(distance * 0.025, 12)}px`);
+        }
+        if (diagram) {
+          const bounds = diagram.getBoundingClientRect();
+          const progress = Math.min(1, Math.max(0, (innerHeight * 0.85 - bounds.top) / (innerHeight * 0.65)));
+          diagram.style.setProperty("--flow-progress", String(progress));
+        }
+      };
+      const requestUpdate = () => { if (!frame) frame = requestAnimationFrame(update); };
+      const resize = new ResizeObserver(requestUpdate);
+      resize.observe(root);
+      window.addEventListener("scroll", requestUpdate, { passive: true });
+      window.addEventListener("resize", requestUpdate);
+      root.dataset.motion = "ready";
+      update();
+      dispose = () => {
+        observer.disconnect();
+        mutations.disconnect();
+        resize.disconnect();
+        animations.forEach((animation) => animation.cancel());
+        cancelAnimationFrame(frame);
+        window.removeEventListener("scroll", requestUpdate);
+        window.removeEventListener("resize", requestUpdate);
+        delete root.dataset.motion;
+        root.style.removeProperty("--page-progress");
+        hero?.style.removeProperty("--hero-drift");
+        diagram?.style.removeProperty("--flow-progress");
+      };
+    }
+    setup();
+    preference.addEventListener("change", setup);
+    return () => { dispose(); preference.removeEventListener("change", setup); };
+  }, []);
+
+  return <div className="scroll-progress" aria-hidden="true"><span /></div>;
+}

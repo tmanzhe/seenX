@@ -836,6 +836,23 @@ body, .docs-site { background: var(--paper); color: var(--ink); }
 .site-header, .docs-header { background: color-mix(in srgb, var(--paper) 82%, transparent); border-color: var(--line); }
 .theme-toggle { display: inline-grid; place-items: center; width: 34px; height: 34px; flex-shrink: 0; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: var(--glass); color: var(--ink); font-size: 22px; line-height: 1; }
 .theme-toggle:hover { border-color: var(--accent); }
+.sound-toggle { display: inline-grid; place-items: center; width: 34px; height: 34px; flex-shrink: 0; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: var(--glass); color: var(--muted); transition: color .18s, border-color .18s; }
+.sound-toggle[aria-pressed="true"] { color: var(--accent); }
+.sound-toggle:hover { border-color: var(--accent); }
+.scroll-progress { display: none; }
+@media (prefers-reduced-motion: no-preference) {
+  .landing-page[data-motion="ready"] .scroll-progress { display: block; position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 50; pointer-events: none; }
+  .scroll-progress > span { display: block; height: 100%; background: var(--accent); transform: scaleX(var(--page-progress, 0)); transform-origin: left; }
+  .landing-page[data-motion="ready"] .hero-copy { translate: 0 var(--hero-drift, 0px); }
+  .landing-page[data-motion="ready"] .connection-line { position: relative; }
+  .landing-page[data-motion="ready"] .connection-line::after { content: ""; position: absolute; top: 0; left: -2px; width: 3px; height: 100%; background: var(--accent); transform: scaleY(var(--flow-progress, 0)); transform-origin: top; }
+  .landing-page[data-motion="ready"] .index-node { box-shadow: 0 0 calc(var(--flow-progress, 0) * 24px) color-mix(in srgb, var(--accent) 16%, transparent); }
+  .landing-page .image-art img { transition: transform .65s cubic-bezier(.16,1,.3,1); }
+  .landing-page .image-card:is(:hover, :focus-visible) .image-art img { transform: scale(1.045); }
+  .landing-page .faq-list details[open] > p { animation: answer-enter .3s ease-out; }
+  @keyframes answer-enter { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+}
+@media (prefers-reduced-motion: no-preference) { .sound-toggle:active { transform: scale(.94); } }
 .docs-header-main { gap: 22px; }
 .site-header .theme-toggle { margin-left: auto; }
 .site-header .button-small { margin-left: -12px; }
@@ -912,9 +929,17 @@ body, .docs-site { background: var(--paper); color: var(--ink); }
 .project-links a:hover { color: var(--accent); }
 @media (max-width: 650px) { .project-checkpoint { grid-template-columns: 1fr; gap: 20px; padding-top: 40px; padding-bottom: 40px; } }
 /* Editorial landing: oversized type, ruled sections, ASCII field. */
-.hero-editorial { max-width: 1440px; margin: auto; min-height: 660px; padding: 100px 65px 90px; text-align: left; display: flex; align-items: center; isolation: isolate; border-bottom: 1px solid var(--line); }
+.hero-editorial { position: relative; overflow: clip; max-width: 1440px; margin: auto; min-height: 660px; padding: 100px 65px 90px; text-align: left; display: flex; align-items: center; isolation: isolate; border-bottom: 1px solid var(--line); }
 .hero-copy { position: relative; z-index: 1; width: 72%; pointer-events: none; }
 .hero-copy a { pointer-events: auto; }
+@media (prefers-reduced-motion: no-preference) {
+  :where(button, .button, .text-link) { transition: scale .18s ease, translate .18s ease, background-color .18s ease, border-color .18s ease, color .18s ease; }
+  @media (hover: hover) and (pointer: fine) {
+    :where(button, .button, .text-link):not(:disabled, [aria-disabled="true"]):hover { scale: 1.035; }
+    :where(.theme-toggle, .sound-toggle, .icon-button):hover { scale: 1.08; }
+  }
+  :where(button, .button, .text-link):not(:disabled, [aria-disabled="true"]):active { scale: .97; }
+}
 .hero-editorial .hero-eyebrow { border: none; background: none; padding: 0; font-family: "SFMono-Regular", Consolas, monospace; font-size: 10px; letter-spacing: 1px; color: var(--muted); }
 .hero-editorial .hero-eyebrow .status-dot { display: none; }
 .hero-editorial h1 { font-size: clamp(60px, 6.5vw, 96px); line-height: 1.05; letter-spacing: -5px; font-weight: 450; margin-top: 28px; }
@@ -926,11 +951,15 @@ body, .docs-site { background: var(--paper); color: var(--ink); }
 .hero-baseline { position: absolute; bottom: 23px; left: 65px; right: 65px; display: flex; justify-content: space-between; align-items: center; gap: 20px; font-family: "SFMono-Regular", Consolas, monospace; font-size: 9px; color: var(--muted); }
 .hero-baseline > span:first-child { color: var(--accent); }
 .ascii-memory { position: absolute; z-index: 0; top: 50px; bottom: 55px; right: 0; width: 57%; overflow: hidden; color: var(--brand); mask-image: linear-gradient(to right, transparent, #000 23%); }
-.ascii-memory pre { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); margin: 0; font-family: "SFMono-Regular", Consolas, monospace; font-size: 12px; line-height: 15px; letter-spacing: 1px; opacity: .5; user-select: none; }
+.ascii-memory pre { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); margin: 0; font-family: "SFMono-Regular", Consolas, monospace; font-size: 11px; line-height: 1.2; letter-spacing: 0; white-space: pre; text-align: left; opacity: .65; user-select: none; font-variant-ligatures: none; }
 .ascii-coordinate { position: absolute; left: 18%; right: 35px; display: flex; justify-content: space-between; font: 8px "SFMono-Regular", Consolas, monospace; letter-spacing: 1px; color: var(--muted); z-index: 1; }
 .ascii-coordinate-top { top: 23px; }
 .ascii-coordinate-bottom { bottom: 15px; }
 .ascii-coordinate button { background: var(--paper); border: none; padding: 6px; color: var(--muted); font: inherit; }
+@media (max-width: 600px) {
+  .hero-editorial .ascii-memory { height: 300px; bottom: 12px; }
+  .hero-editorial .ascii-memory pre { font-size: clamp(5.5px, 1.5vw, 6.25px); line-height: 1.2; }
+}
 .landing-page .demo-section { max-width: 1270px; padding-top: 40px; }
 .landing-section-label { display: flex; justify-content: space-between; gap: 20px; font: 9px "SFMono-Regular", Consolas, monospace; color: var(--muted); margin: 0 0 28px; }
 .landing-page .floating-note { display: none; }

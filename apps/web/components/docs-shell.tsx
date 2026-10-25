@@ -8,6 +8,7 @@ import { DocsNav } from "./docs-nav";
 import { Brand } from "./site-chrome";
 import { Icon } from "./icon";
 import { ThemeToggle } from "./theme-toggle";
+import { SoundToggle } from "./sound-controls";
 
 export function DocsShell({ children, searchEntries }: { children: ReactNode; searchEntries: DocSearchEntry[] }) {
   const pathname = usePathname();
@@ -38,7 +39,7 @@ export function DocsShell({ children, searchEntries }: { children: ReactNode; se
         <div className="docs-header-main">
           <div className="docs-brand"><Brand /><span className="docs-brand-divider" /><Link href={isLearning ? "/learning" : "/docs"}>{isLearning ? "learning" : "docs"}</Link></div>
           <button className="docs-search-trigger" onClick={() => dialog.current?.showModal()}><Icon name="search" size={17} /><span>{isLearning ? "Search learning…" : "Search documentation…"}</span><kbd>⌘ K</kbd></button>
-          <ThemeToggle /><Link href="/" className="docs-back-link">Back to seenX <Icon name="diagonal" size={14} /></Link>
+          <ThemeToggle /><SoundToggle /><Link href="/" className="docs-back-link">Back to seenX <Icon name="diagonal" size={14} /></Link>
         </div>
         <div className="docs-header-tabs">
           <nav aria-label="Site sections"><Link href="/docs" aria-current={!isLearning ? "page" : undefined}>Documentation</Link><Link href="/learning" aria-current={isLearning ? "page" : undefined}>Learning</Link></nav>

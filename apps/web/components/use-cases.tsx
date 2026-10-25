@@ -32,7 +32,7 @@ export function UseCases() {
       </div>
       <div role="tabpanel" id="audience-panel" aria-labelledby={`audience-${audience}`} tabIndex={0}>
         <div className="use-case-grid">{examples[audience].map((example) => <article key={example.category}><div className="use-case-top"><span>{example.category}</span><Icon name={example.icon} size={21} /></div><h3>{example.title}</h3><blockquote>{example.query}</blockquote><p>{example.detail}</p></article>)}</div>
-        <div className="use-case-bottom"><span>{audience === "agents" ? "Agent access is on the roadmap." : "Built around the things you already save."}</span><Link href={audience === "agents" ? "/docs/agent-workflows" : "/docs/personal-search"} className="text-link">Explore the use cases <Icon name="arrow" size={15} /></Link></div>
+        <div className="use-case-bottom">{audience === "personal" && <span>Built around the things you already save.</span>}<Link href={audience === "agents" ? "/docs/agent-workflows" : "/docs/personal-search"} className="text-link">Explore the use cases <Icon name="arrow" size={15} /></Link></div>
       </div>
     </section>
   );

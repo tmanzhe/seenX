@@ -38,7 +38,7 @@ export function SearchDemo() {
     <div className="demo-wrap" id="demo">
       <div className="floating-note"><span className="note-arrow">↙</span> Go on, try remembering something.</div>
       <div className="desktop-window">
-        <div className="window-bar"><div className="traffic-lights" aria-hidden="true"><i /><i /><i /></div><span>seenX</span><span className="preview-label">INTERACTIVE CONCEPT</span></div>
+        <div className="window-bar"><div className="traffic-lights" aria-hidden="true"><i /><i /><i /></div><span>seenX</span><span aria-hidden="true" /></div>
         <div className="desktop-body">
           <aside className="demo-sidebar" aria-label="Demo library filters">
             <div className="sidebar-heading">YOUR LIBRARY</div>

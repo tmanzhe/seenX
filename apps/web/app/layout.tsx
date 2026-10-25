@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { SiteFrame } from "../components/site-frame";
+import { SoundProvider } from "../components/sound-controls";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -11,9 +12,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" data-scroll-behavior="smooth">
-      <body>
+      <body style={{ isolation: "isolate" }}>
         <a className="skip-link" href="#main">Skip to content</a>
-        <SiteFrame>{children}</SiteFrame>
+        <SoundProvider><SiteFrame>{children}</SiteFrame></SoundProvider>
       </body>
     </html>
   );
