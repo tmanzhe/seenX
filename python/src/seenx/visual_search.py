@@ -10,14 +10,14 @@ from time import perf_counter
 
 from PIL import Image, ImageOps, UnidentifiedImageError
 
-from record_cache import get_record, open_cache, save_record
-from observability import configure_logging, count, event, file_id, run_context, stage
+from seenx.record_cache import get_record, open_cache, save_record
+from seenx.observability import configure_logging, count, event, file_id, run_context, stage
+from seenx.paths import CACHE_PATH, MODEL_CACHE
 
 
 MODEL_ID = "openai/clip-vit-base-patch32"
 # Explicit safetensors conversion revision in the original model repository.
 MODEL_REVISION = "c7244be81152024ce0e99ac8d2e373a8953d9f9a"
-MODEL_CACHE = Path(__file__).resolve().parent.parent / "models" / "huggingface"
 EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff"}
 DEFAULT_MIN_SCORE = 0.25
 
@@ -72,7 +72,7 @@ class ClipEncoder:
             import torch
             from transformers import CLIPModel, CLIPProcessor
         except ImportError as error:
-            raise RuntimeError('Install visual support: python -m pip install -e ".[visual]"') from error
+            raise RuntimeError("Install visual support from the repo root: uv sync --project python --extra visual") from error
         self.torch = torch
         options = {
             "revision": MODEL_REVISION,
@@ -179,7 +179,7 @@ def main() -> None:
                 encoder = ClipEncoder(download=args.download_model)
             event("model_ready", model_id=MODEL_ID, model_revision=MODEL_REVISION, reused_instance=False)
             loaded = perf_counter()
-            cache_path = Path(__file__).resolve().parent / ".cache" / "records.sqlite3" if args.cache else None
+            cache_path = CACHE_PATH if args.cache else None
             with open_cache(cache_path) as cache, stage("visual_index"):
                 records = collect_embeddings(folder, encoder, args.limit, cache)
             indexed = perf_counter()
@@ -194,7 +194,7 @@ def main() -> None:
             event("search_results", returned=len(results), score_kind="cosine")
             searched = perf_counter()
     except (ImportError, OSError, RuntimeError, ValueError, sqlite3.Error) as error:
-        parser.exit(1, f"Visual search failed: {error}\nFor a first run, install .[visual] and use --download-model.\n")
+        parser.exit(1, f"Visual search failed: {error}\nFor a first run, use uv sync --project python --extra visual from the repo root, then add --download-model.\n")
 
     print(f"Visual matches with cosine >= {args.min_score:g} (scores are not probabilities):")
     for number, result in enumerate(results, start=1):

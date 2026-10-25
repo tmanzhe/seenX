@@ -5,13 +5,15 @@ import logging
 from pathlib import Path
 import sqlite3
 
+from seenx.paths import CACHE_PATH
+
 from PIL import Image, UnidentifiedImageError
 from pypdf import PdfReader
 from pypdf.errors import PyPdfError
 
-from image_ocr import check_ocr_available, extract_image_text
-from record_cache import get_record, open_cache, reader_key, save_record
-from observability import count, event, file_id, stage
+from seenx.image_ocr import check_ocr_available, extract_image_text
+from seenx.record_cache import get_record, open_cache, reader_key, save_record
+from seenx.observability import count, event, file_id, stage
 
 
 def inspect_image(path: Path, ocr: bool = False) -> dict:
@@ -158,7 +160,7 @@ def main() -> None:
             check_ocr_available()
         except RuntimeError as error:
             parser.error(str(error))
-    cache_path = Path(__file__).resolve().parent / ".cache" / "records.sqlite3" if args.cache else None
+    cache_path = CACHE_PATH if args.cache else None
     try:
         with open_cache(cache_path) as cache:
             records = read_folder(folder, args.limit, args.ocr, cache, args.refresh)

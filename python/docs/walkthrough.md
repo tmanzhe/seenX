@@ -1,76 +1,6 @@
-# Learning Python by building seenX
+# How we built seenX in Python
 
-We're building a local file-search prototype, one useful piece at a time. The idea is to find a screenshot, photo, or document using something you remember about it. Python lets us try the pieces and understand the results before deciding what belongs in the Rust desktop engine.
-
-Right now we can read images and PDFs, recognize image text with optional local OCR, search that text, and retrieve images by visual description using CLIP embeddings. `search_files.py` brings those approaches together in one command with text, visual, and hybrid modes. An optional SQLite cache lets us reuse extracted records and image vectors between runs. We haven't added a Python web server. Both OCR and visual search use pretrained models; we aren't training them. The Next.js website is a separate project under `apps/web`; these scripts aren't connected to it.
-
-## Get it running
-
-These commands start at the repository root. You need Python 3.13 or newer installed.
-
-```sh
-cd experiments
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -e .
-mkdir -p ../practice-images
-python load_images.py ../practice-images
-```
-
-Put a few of your own JPEGs, PNGs, or PDFs into `practice-images` before the last command. You can also pass an existing folder:
-
-```sh
-python load_images.py "/path/to/your/folder" --limit 5
-```
-
-Quotes keep a path containing spaces together as one argument. `--limit 5` means stop after five successfully read files, not five PDF pages. The default is ten files. We only inspect the immediate folder, not subfolders.
-
-On later visits, you only need to activate the environment and run the script. Run `deactivate` to leave the environment. For command help, run `python load_images.py --help`.
-
-### What did those setup commands do?
-
-- `cd experiments` changes the terminal's current directory. Relative paths are interpreted from that directory.
-- `python3 -m venv .venv` asks Python to run its built-in `venv` module and create an isolated environment in `.venv`.
-- `source .venv/bin/activate` tells this terminal to use that environment's Python and packages.
-- `python -m pip install -e .` installs the dependencies recorded in `pyproject.toml`. The dot means the current directory; `-e` means an editable project installation.
-- `mkdir -p ../practice-images` creates our input folder if it doesn't already exist. `..` means the parent directory.
-
-`pyproject.toml` also names setuptools as the installation tool and explicitly identifies `load_images` as our Python module. That prevents the installer from mistaking local data folders for code packages. You don't need to learn packaging internals to run the script.
-
-A virtual environment isn't a virtual machine. Python still runs directly on your Mac. It just keeps this project's packages separate from other projects. `bin` is a directory of executable programs; `.venv/bin/python` is the interpreter that executes our script. You don't write application code inside it.
-
-Check which interpreter you're using:
-
-```sh
-python -c "import sys; print(sys.executable)"
-```
-
-The printed path should point inside this project's `.venv`. From the repository root, you can skip activation by calling it explicitly:
-
-```sh
-experiments/.venv/bin/python experiments/load_images.py practice-images
-```
-
-## Where things live
-
-| Location | What it's for |
-| --- | --- |
-| `load_images.py` | The Python script. Despite the name, it now supports PDFs too. |
-| `image_ocr.py` | The small adapter between Python and Apple's Vision OCR framework. |
-| `record_cache.py` | Stores and retrieves extracted records with Python's built-in SQLite support. |
-| `visual_search.py` | A separate command for matching image contents against a text description. |
-| `search_files.py` | The combined search command and reusable search function. Start with step 8 to try all modes. |
-| `observability.py` | Local structured logs, run IDs, counters, and stage timers. |
-| `test_search.py`, `test_ocr.py`, `test_cache.py` | Repeatable checks for matching, OCR, and cache behavior. |
-| `pyproject.toml` | The Python version requirement and dependencies. |
-| `.venv/` | The interpreter and installed packages. Generated locally and ignored by Git. |
-| `../practice-images/` | Your original files. Ignored by Git. |
-| `data/`, `outputs/` | Empty leftovers from an early smoke check. The script doesn't use them. |
-| `.cache/records.sqlite3` | Optional local database created by `--cache`. Contains extracted text and paths; ignored by Git. |
-| `.cache/logs/search.jsonl` | Local diagnostic events, rotated by size and ignored by Git. |
-| `../models/huggingface/` | Downloaded model files. Local and ignored by Git. |
-
-The script doesn't save converted images, thumbnails, or a manifest. Your originals are opened for reading. Without `--cache`, extracted text stays in memory for this run. With `--cache`, text and file paths are saved in the local database. Extracted contents aren't printed. Personal files, cache databases, model downloads, and future experiment outputs should stay out of Git.
+This is the detailed learning walkthrough. Start with the [Python README](../README.md) for setup, commands, and the folder map. Commands in this guide run from the repository's `python/` directory after `uv sync --all-extras`. The original scripts now live in `src/seenx/`, and their terminal entry points are `seenx-inspect`, `seenx-visual`, and `seenx-search`.
 
 ## How we built this, and why
 
@@ -147,10 +77,10 @@ The list lives during the run, and PDF text consumes memory while retained. Step
 
 ### 4. Search the PDF text
 
-Now we can do something useful with those records. From `experiments`, with the environment activated:
+Now we can do something useful with those records. From `python`, with the environment activated:
 
 ```sh
-python load_images.py ../practice-images --query "a phrase from your PDF"
+uv run seenx-inspect ../practice-images --query "a phrase from your PDF"
 ```
 
 Replace the quoted phrase with words you know appear in one of your documents. You'll see the usual file summaries followed by matching file paths and page numbers. We don't print document excerpts. A page appears once even if the phrase occurs several times. Zero matches is a normal result; an empty or whitespace-only query is an input error.
@@ -183,7 +113,7 @@ Without caching, every run reads the files again. `--limit` still applies to the
 We test the matching behavior with invented text dictionaries, not copies of personal documents or generated images:
 
 ```sh
-python -m unittest discover -s . -p 'test_*.py' -v
+uv run python -m unittest discover -s tests -p 'test_*.py' -v
 ```
 
 The tests check capitalization, whitespace, Unicode matching, correct page references, multiple documents, missing matches, empty pages, and blank queries. They also check that a repeated phrase only returns its page once.
@@ -192,12 +122,12 @@ The tests check capitalization, whitespace, Unicode matching, correct page refer
 
 Pillow gives us pixels. To turn visible words into a Python string, we need optical character recognition. We chose **Apple Vision** because this project targets macOS and we can use the operating system's OCR locally. **PyObjC** is the bridge that lets Python call Apple's Objective-C APIs. It isn't an OCR engine itself.
 
-On a Mac, run these commands from `experiments`, with the environment activated:
+On a Mac, run these commands from `python`, with the environment activated:
 
 ```sh
-python -m pip install -e ".[ocr]"
-python load_images.py ../practice-images --ocr
-python load_images.py ../practice-images --ocr --query "words visible in your image"
+uv sync --extra ocr
+uv run seenx-inspect ../practice-images --ocr
+uv run seenx-inspect ../practice-images --ocr --query "words visible in your image"
 ```
 
 `[ocr]` selects the optional dependency group in `pyproject.toml`. Plain file reading and PDF text search don't require it. On other operating systems, `--ocr` exits with a clear message; we haven't added a portable OCR backend yet.
@@ -229,11 +159,11 @@ The tests include mixed image/PDF search and clear errors for unsupported platfo
 
 Once OCR worked, a practical problem showed up: each new query ran recognition again. We added an optional **cache**, a saved copy of extraction results that we can reuse when the source hasn't changed.
 
-From `experiments`, with the environment activated:
+From `python`, with the environment activated:
 
 ```sh
-python load_images.py ../practice-images --ocr --cache --query "your phrase"
-python load_images.py ../practice-images --ocr --cache --query "another phrase"
+uv run seenx-inspect ../practice-images --ocr --cache --query "your phrase"
+uv run seenx-inspect ../practice-images --ocr --cache --query "another phrase"
 ```
 
 On the first run the database starts empty. On the next run, a line such as `Cache: reused 9 of 9 loaded file(s).` tells you extraction was skipped for those files. Without `--cache`, the command behaves as it did before and doesn't read or write the database.
@@ -266,12 +196,12 @@ SQLite stores the dictionary as **JSON**, a text format for lists, dictionaries,
 To deliberately rerun extraction for the files in this scan:
 
 ```sh
-python load_images.py ../practice-images --ocr --cache --refresh
+uv run seenx-inspect ../practice-images --ocr --cache --refresh
 ```
 
 `--refresh` requires `--cache`. It bypasses saved records and replaces successful results. Known OCR failures aren't saved, so failed recognition is retried rather than becoming a permanent empty result. A file whose size or timestamp changes during extraction is skipped and can be retried next time.
 
-We still scan the selected folder on every run. A deleted file therefore won't appear in results, even if an old row remains in the database. Old rows aren't automatically purged: the database retains extracted text until you remove it. To discard all cached text, stop the script and delete `.cache/records.sqlite3` inside `experiments`; the next cached run creates it again. The database is ordinary unencrypted local storage and stays ignored by Git.
+We still scan the selected folder on every run. A deleted file therefore won't appear in results, even if an old row remains in the database. Old rows aren't automatically purged: the database retains extracted text until you remove it. To discard all cached text, stop the script and delete `.cache/records.sqlite3` inside `python`; the next cached run creates it again. The database is ordinary unencrypted local storage and stays ignored by Git.
 
 This is an extraction cache, not a database search engine. Search still uses the same Python substring matching over the loaded records, and the file limit still applies. Caching avoids repeated OCR and PDF extraction; it doesn't add ranking, folder watching, or full-text indexing. OCR dependencies are still required whenever `--ocr` is requested, even with a warm cache.
 
@@ -281,11 +211,11 @@ The cache tests use temporary placeholder files and invented records. They check
 
 OCR can read the word "cat" in a screenshot, but a cat photo may contain no writing at all. For that we added a separate visual-search command. Keeping it separate makes it easy to compare visual retrieval with exact text matching before combining them.
 
-From `experiments`, activate the environment and install the optional model libraries:
+From `python`, activate the environment and install the optional model libraries:
 
 ```sh
-python -m pip install -e ".[visual]"
-python visual_search.py ../practice-images --query "a photo of a laptop computer" --cache --download-model
+uv sync --extra visual
+uv run seenx-visual ../practice-images --query "a photo of a laptop computer" --cache --download-model
 ```
 
 The first run downloads the pinned model files from Hugging Face into `models/huggingface` at the repository root. The model weights are roughly 600 MB, in addition to the Python packages. Your images are processed locally and aren't uploaded. No generated images or thumbnails are saved.
@@ -293,7 +223,7 @@ The first run downloads the pinned model files from Hugging Face into `models/hu
 After the download, leave off `--download-model`:
 
 ```sh
-python visual_search.py ../practice-images --query "a photo of a cat" --cache
+uv run seenx-visual ../practice-images --query "a photo of a cat" --cache
 ```
 
 The default is local-files-only model loading. If the model isn't downloaded, the command fails with instructions rather than silently downloading it. `--download-model` permits fetching missing model files; it doesn't upload the input collection. You can additionally set `HF_HUB_OFFLINE=1` and `TRANSFORMERS_OFFLINE=1` when checking an offline run.
@@ -350,23 +280,23 @@ References: [CLIP model and processor documentation](https://huggingface.co/docs
 
 The two experiments worked independently. Next we wanted to ask one query, choose a search approach, and get results in one consistent shape. We added `search_files.py` to coordinate the existing readers rather than copying their implementation.
 
-From `experiments`, with the environment activated, text-only search works with the base dependencies:
+From `python`, with the environment activated, text-only search works with the base dependencies:
 
 ```sh
-python search_files.py ../practice-images --mode text --query "a phrase from your PDF" --cache
+uv run seenx-search ../practice-images --mode text --query "a phrase from your PDF" --cache
 ```
 
 For visual search, install `.[visual]` as described in step 7 and download the pinned model once. Then:
 
 ```sh
-python search_files.py ../practice-images --mode visual --query "a photo of a laptop computer" --cache
+uv run seenx-search ../practice-images --mode visual --query "a photo of a laptop computer" --cache
 ```
 
 For the combined mode on macOS, install both optional groups and include OCR if you want screenshot words searched too:
 
 ```sh
-python -m pip install -e ".[ocr,visual]"
-python search_files.py ../practice-images --mode hybrid --ocr --query "your phrase" --cache
+uv sync --all-extras
+uv run seenx-search ../practice-images --mode hybrid --ocr --query "your phrase" --cache
 ```
 
 `hybrid` is the default mode. Add `--download-model` to a visual or hybrid first run if the model hasn't been downloaded. Model loading is otherwise local-files-only. Text mode never loads CLIP. Visual mode never reads PDF text and rejects `--ocr` rather than silently ignoring it. Without `--ocr`, text matching covers extracted PDF text only. OCR dependencies are required whenever you request OCR.
@@ -433,8 +363,8 @@ We separated **ranking** from **acceptance**. `rank_images()` still orders the c
 Both commands use the same default minimum cosine score of `0.25`:
 
 ```sh
-python visual_search.py ../practice-images --query "basketball" --cache
-python search_files.py ../practice-images --mode hybrid --ocr --query "a laptop" --cache
+uv run seenx-visual ../practice-images --query "basketball" --cache
+uv run seenx-search ../practice-images --mode hybrid --ocr --query "a laptop" --cache
 ```
 
 We inspected the actual similarities before choosing that starting point:
@@ -450,7 +380,7 @@ The first two best images were visually checked against the queries. These few q
 To require stronger similarity:
 
 ```sh
-python search_files.py ../practice-images --mode visual --query "a laptop" --cache --min-score 0.28
+uv run seenx-search ../practice-images --mode visual --query "a laptop" --cache --min-score 0.28
 ```
 
 Raising the cutoff usually removes more weak results but can also hide relevant images. Lowering it retrieves more candidates but can show more unrelated images. In retrieval terms, that's a **precision/recall tradeoff**: precision asks how many returned results are relevant; recall asks how many relevant items we found. We need more labeled positive and negative queries to measure both.
@@ -470,13 +400,13 @@ We needed a way to answer "what happened?" without guessing from the final resul
 **Logging** records events: a model loaded, a file was skipped, a cache lookup missed. **Metrics** are measurements such as result counts, cache hits, and elapsed milliseconds. **Observability** is using those signals to understand what the program did. Recording these signals doesn't improve relevance by itself; labeled examples are still how we check accuracy.
 
 ```sh
-python search_files.py ../practice-images --mode hybrid --ocr --cache --query "your phrase" --debug
+uv run seenx-search ../practice-images --mode hybrid --ocr --cache --query "your phrase" --debug
 ```
 
 Each run prints its ID. Events saved under `.cache/logs/search.jsonl` have the same ID, a UTC timestamp, a severity level, and an event name. JSONL means one JSON object per line. From the repository root, inspect recent events with:
 
 ```sh
-tail -n 20 experiments/.cache/logs/search.jsonl
+tail -n 20 python/.cache/logs/search.jsonl
 ```
 
 Normal logs include settings, candidate counts, exact text match counts, stage durations, cutoff totals, and a final summary. `--debug` adds cache decisions and individual image cosine scores with acceptance/rejection reasons. File identifiers are hashed with the run ID, so they correlate events for a file within that run without saving its full path. The saved logs omit raw queries, extracted text, vectors, full source paths, and exception messages. They retain query length, numeric scores, error types, and model identity. The terminal still displays matching paths and readable error messages.
@@ -615,4 +545,4 @@ The broader path is Python engine → useful retrieval → local interface/API �
 
 Later, we'll compare keyword and semantic retrieval on labeled queries, and test whether relationships such as receipts belonging to trips improve results. Models may propose relationships; evidence and user confirmation need to stay distinguishable. We will measure useful behavior before moving it into the Rust engine. Python is our development reference, not a required runtime for the intended desktop release.
 
-See the [project overview](../README.md), [architecture](../docs/architecture.md), and [implementation plan](../plan.md).
+See the [project overview](../../README.md), [architecture](../../docs/architecture.md), and [implementation plan](../../plan.md).

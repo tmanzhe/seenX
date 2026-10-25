@@ -8,8 +8,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from load_images import read_folder
-from record_cache import get_record, open_cache, save_record
+from seenx.load_images import read_folder
+from seenx.record_cache import get_record, open_cache, save_record
 
 
 class CacheTests(unittest.TestCase):
@@ -58,7 +58,7 @@ class CacheTests(unittest.TestCase):
 
     def test_folder_reuses_records_refreshes_and_ignores_removed_files(self):
         with open_cache(self.database) as cache, redirect_stdout(StringIO()):
-            with patch("load_images.inspect_pdf", return_value=self.record) as reader:
+            with patch("seenx.load_images.inspect_pdf", return_value=self.record) as reader:
                 first = read_folder(self.folder, 10, False, cache)
                 second = read_folder(self.folder, 10, False, cache)
                 self.assertEqual(first, second)
@@ -77,7 +77,7 @@ class CacheTests(unittest.TestCase):
             return self.record
 
         with open_cache(self.database) as cache, redirect_stdout(StringIO()):
-            with patch("load_images.inspect_pdf", side_effect=change_file):
+            with patch("seenx.load_images.inspect_pdf", side_effect=change_file):
                 self.assertEqual(read_folder(self.folder, 10, False, cache), [])
             self.assertEqual(cache.execute("SELECT COUNT(*) FROM records").fetchone()[0], 0)
 

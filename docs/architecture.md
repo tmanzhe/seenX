@@ -12,7 +12,7 @@ First make retrieval useful in Python. Then a local API, potentially FastAPI, ca
 
 | Component | Responsibility |
 | --- | --- |
-| [Python experiments](../experiments/README.md) | Learn OCR, embeddings, metadata, hybrid retrieval, and ontology; evaluate reproducibly |
+| [Python engine](../python/README.md) | Learn OCR, embeddings, metadata, hybrid retrieval, and ontology; evaluate reproducibly |
 | [Rust core](../crates/seenx-core/README.md) | Production catalog, indexing, retrieval, ranking, and evidence |
 | [Website](../apps/web/README.md) | Product explanation, learning guides, and sample interaction preview |
 | [macOS app](../apps/macos/README.md) | Later SwiftUI presentation, permissions, previews, and platform adapters |

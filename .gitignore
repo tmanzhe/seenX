@@ -43,6 +43,6 @@ npm-debug.log*
 
 # Local experiment data, outputs, and notebook caches
 .ipynb_checkpoints/
-/experiments/data/
-/experiments/outputs/
-/experiments/.cache/
+/python/data/
+/python/outputs/
+/python/.cache/

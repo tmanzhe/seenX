@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "seenx-experiments"
+name = "seenx"
 version = "0.1.0"
-description = "Python learning and retrieval proofs of concept for seenX"
+description = "Local text and visual retrieval prototype for seenX"
 requires-python = ">=3.13"
 dependencies = ["Pillow>=12.0,<13", "pypdf>=6,<7"]
 
@@ -13,8 +13,10 @@ dependencies = ["Pillow>=12.0,<13", "pypdf>=6,<7"]
 ocr = ["pyobjc-framework-Vision>=11,<13; sys_platform == 'darwin'"]
 visual = ["torch>=2.6,<3", "transformers>=4.50,<5"]
 
-[tool.setuptools]
-py-modules = ["load_images", "image_ocr", "record_cache", "visual_search", "search_files", "observability"]
+[project.scripts]
+seenx-inspect = "seenx.load_images:main"
+seenx-visual = "seenx.visual_search:main"
+seenx-search = "seenx.search_files:main"
 
-[tool.uv]
-package = false
+[tool.setuptools.packages.find]
+where = ["src"]

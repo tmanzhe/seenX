@@ -7,7 +7,7 @@ from pathlib import Path
 import platform
 import sqlite3
 
-from observability import count, event, file_id
+from seenx.observability import count, event, file_id
 import logging
 
 @contextmanager

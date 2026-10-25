@@ -2,7 +2,7 @@
 
 import unittest
 
-from load_images import search_text
+from seenx.load_images import search_text
 
 
 class SearchTests(unittest.TestCase):

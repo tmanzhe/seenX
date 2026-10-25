@@ -14,7 +14,7 @@ def check_ocr_available() -> None:
         import Foundation
         import objc
     except ImportError as error:
-        raise RuntimeError('Install OCR support: python -m pip install -e ".[ocr]"') from error
+        raise RuntimeError("Install OCR support from the repo root: uv sync --project python --extra ocr") from error
 
 
 def extract_image_text(source) -> str:

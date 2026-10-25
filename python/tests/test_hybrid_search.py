@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
-from search_files import fuse_results, search_files, select_paths
+from seenx.search_files import fuse_results, search_files, select_paths
 
 
 class FusionTests(unittest.TestCase):
@@ -73,8 +73,8 @@ class SearchFlowTests(unittest.TestCase):
         encoder = Mock()
         encoder.encode_text.return_value = [1, 0]
         vectors = [{"path": str(self.folder / "b.jpg"), "embedding": [1, 0]}]
-        with redirect_stdout(StringIO()), patch("search_files.read_folder", return_value=self.text) as reader:
-            with patch("search_files.collect_embeddings", return_value=vectors) as collect:
+        with redirect_stdout(StringIO()), patch("seenx.search_files.read_folder", return_value=self.text) as reader:
+            with patch("seenx.search_files.collect_embeddings", return_value=vectors) as collect:
                 results = search_files(self.folder, "booking", limit=2, encoder=encoder)
         self.assertEqual(reader.call_args.kwargs["paths"],
                          [self.folder / "a.pdf", self.folder / "b.jpg"])
@@ -89,8 +89,8 @@ class SearchFlowTests(unittest.TestCase):
             {"path": str(self.folder / "b.jpg"), "embedding": [0.3, math.sqrt(1 - 0.3 ** 2)]},
             {"path": str(self.folder / "c.jpg"), "embedding": [0.2, math.sqrt(1 - 0.2 ** 2)]},
         ]
-        with redirect_stdout(StringIO()), patch("search_files.read_folder", return_value=self.text):
-            with patch("search_files.collect_embeddings", return_value=vectors):
+        with redirect_stdout(StringIO()), patch("seenx.search_files.read_folder", return_value=self.text):
+            with patch("seenx.search_files.collect_embeddings", return_value=vectors):
                 results = search_files(self.folder, "booking", encoder=encoder)
                 strict = search_files(self.folder, "booking", encoder=encoder, min_score=0.5)
         self.assertEqual({Path(result["path"]).name for result in results}, {"a.pdf", "b.jpg"})
@@ -103,21 +103,21 @@ class SearchFlowTests(unittest.TestCase):
         image_path = str(self.folder / "b.jpg")
         text = [{"path": image_path, "kind": "image", "text": "booking"}]
         vectors = [{"path": image_path, "embedding": [0, 1]}]
-        with redirect_stdout(StringIO()), patch("search_files.read_folder", return_value=text):
-            with patch("search_files.collect_embeddings", return_value=vectors):
+        with redirect_stdout(StringIO()), patch("seenx.search_files.read_folder", return_value=text):
+            with patch("seenx.search_files.collect_embeddings", return_value=vectors):
                 results = search_files(self.folder, "booking", encoder=encoder)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0]["evidence"], [{"method": "image-ocr", "rank": 1}])
 
     def test_text_mode_does_not_load_clip(self):
-        with redirect_stdout(StringIO()), patch("search_files.read_folder", return_value=self.text):
-            with patch("search_files.ClipEncoder", side_effect=AssertionError("model loaded")):
+        with redirect_stdout(StringIO()), patch("seenx.search_files.read_folder", return_value=self.text):
+            with patch("seenx.search_files.ClipEncoder", side_effect=AssertionError("model loaded")):
                 results = search_files(self.folder, "booking", mode="text")
         self.assertEqual(results[0]["page"], 1)
 
     def test_pdf_only_selection_does_not_load_clip_in_hybrid_mode(self):
-        with redirect_stdout(StringIO()), patch("search_files.read_folder", return_value=self.text):
-            with patch("search_files.ClipEncoder", side_effect=AssertionError("model loaded")):
+        with redirect_stdout(StringIO()), patch("seenx.search_files.read_folder", return_value=self.text):
+            with patch("seenx.search_files.ClipEncoder", side_effect=AssertionError("model loaded")):
                 results = search_files(self.folder, "booking", mode="hybrid", limit=1)
         self.assertEqual(results[0]["evidence"][0]["method"], "pdf-text")
 
@@ -125,8 +125,8 @@ class SearchFlowTests(unittest.TestCase):
         encoder = Mock()
         encoder.encode_text.return_value = [1, 0]
         vectors = [{"path": str(self.folder / "b.jpg"), "embedding": [1, 0]}]
-        with redirect_stdout(StringIO()), patch("search_files.read_folder", side_effect=AssertionError("text reader called")):
-            with patch("search_files.collect_embeddings", return_value=vectors):
+        with redirect_stdout(StringIO()), patch("seenx.search_files.read_folder", side_effect=AssertionError("text reader called")):
+            with patch("seenx.search_files.collect_embeddings", return_value=vectors):
                 results = search_files(self.folder, "laptop", mode="visual", encoder=encoder)
         self.assertEqual(results[0]["score_kind"], "cosine")
 
@@ -140,7 +140,7 @@ class SearchFlowTests(unittest.TestCase):
             arguments = {"query": "booking", **options}
             with self.subTest(options=options), self.assertRaises(ValueError):
                 search_files(self.folder, **arguments)
-        with redirect_stdout(StringIO()), patch("search_files.read_folder", return_value=[]):
+        with redirect_stdout(StringIO()), patch("seenx.search_files.read_folder", return_value=[]):
             with self.assertRaisesRegex(ValueError, "could be read"):
                 search_files(self.folder, "booking", mode="text")
 

@@ -14,7 +14,7 @@ from time import perf_counter
 from uuid import uuid4
 
 
-LOG_PATH = Path(__file__).resolve().parent / ".cache" / "logs" / "search.jsonl"
+from seenx.paths import LOG_PATH
 LOGGER = logging.getLogger("seenx")
 LOGGER.addHandler(logging.NullHandler())
 LOGGER.propagate = False

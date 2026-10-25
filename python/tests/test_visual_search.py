@@ -3,7 +3,7 @@
 import math
 import unittest
 
-from visual_search import filter_visual_matches, normalize_vector, rank_images
+from seenx.visual_search import filter_visual_matches, normalize_vector, rank_images
 
 
 class VisualSearchTests(unittest.TestCase):

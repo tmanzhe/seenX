@@ -42,4 +42,4 @@ A Rust CLI can exercise real retrieval before desktop integration. SwiftUI later
 
 Try visual queries against the practice images, label acceptable results before measuring retrieval quality, and compare them with OCR/keyword search. Keep the model revision and preprocessing fixed. Verify cached and offline runs. Explain the concepts as we go and document each feature before expanding toward the local interface.
 
-See the [architecture](docs/architecture.md), [experiments](experiments/README.md), and [README](README.md).
+See the [architecture](docs/architecture.md), [Python engine](python/README.md), and [README](README.md).

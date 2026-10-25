@@ -5,8 +5,8 @@ import sys
 import unittest
 from unittest.mock import patch
 
-from image_ocr import check_ocr_available
-from load_images import inspect_image
+from seenx.image_ocr import check_ocr_available
+from seenx.load_images import inspect_image
 
 
 class OcrTests(unittest.TestCase):
@@ -18,23 +18,23 @@ class OcrTests(unittest.TestCase):
     def test_missing_optional_dependency_has_install_instructions(self):
         with patch.object(sys, "platform", "darwin"):
             with patch.dict(sys.modules, {"Vision": None}):
-                with self.assertRaisesRegex(RuntimeError, "pip install"):
+                with self.assertRaisesRegex(RuntimeError, "uv sync"):
                     check_ocr_available()
 
     def test_image_records_distinguish_disabled_empty_and_failed_ocr(self):
         # Personal images are optional. No test fixture is copied or committed.
-        folder = Path(__file__).resolve().parent.parent / "practice-images"
+        folder = Path(__file__).resolve().parents[2] / "practice-images"
         image = next(folder.glob("*.jpeg"), None)
         if image is None:
             self.skipTest("No local JPEG practice image available")
-        with patch("load_images.extract_image_text", return_value="") as recognize:
+        with patch("seenx.load_images.extract_image_text", return_value="") as recognize:
             plain = inspect_image(image)
             recognize.assert_not_called()
             self.assertNotIn("text", plain)
             empty = inspect_image(image, ocr=True)
             self.assertEqual(empty["text"], "")
             self.assertEqual(empty["text_method"], "apple-vision-ocr")
-        with patch("load_images.extract_image_text", side_effect=RuntimeError("test failure")):
+        with patch("seenx.load_images.extract_image_text", side_effect=RuntimeError("test failure")):
             failed = inspect_image(image, ocr=True)
             self.assertEqual(failed["ocr_error"], "test failure")
             self.assertNotIn("text", failed)

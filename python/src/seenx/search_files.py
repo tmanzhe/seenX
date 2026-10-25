@@ -5,12 +5,14 @@ import logging
 from pathlib import Path
 import sqlite3
 
-from image_ocr import check_ocr_available
-from load_images import normalize_text, read_folder, search_text
-from record_cache import open_cache
-from visual_search import (ClipEncoder, DEFAULT_MIN_SCORE, EXTENSIONS, MODEL_ID, MODEL_REVISION,
+from seenx.paths import CACHE_PATH
+
+from seenx.image_ocr import check_ocr_available
+from seenx.load_images import normalize_text, read_folder, search_text
+from seenx.record_cache import open_cache
+from seenx.visual_search import (ClipEncoder, DEFAULT_MIN_SCORE, EXTENSIONS, MODEL_ID, MODEL_REVISION,
                            collect_embeddings, filter_visual_matches, rank_images)
-from observability import configure_logging, count, event, file_id, observed_search, run_context, stage
+from seenx.observability import configure_logging, count, event, file_id, observed_search, run_context, stage
 
 FUSION_SMOOTHING = 60
 
@@ -164,7 +166,7 @@ def main() -> None:
     parser.add_argument("--debug", action="store_true", help="Include per-file cache and score decisions in local logs")
     parser.add_argument("--no-log", action="store_true", help="Disable persistent local logs")
     args = parser.parse_args()
-    cache_path = Path(__file__).resolve().parent / ".cache" / "records.sqlite3" if args.cache else None
+    cache_path = CACHE_PATH if args.cache else None
     try:
         configure_logging(enabled=not args.no_log, debug=args.debug)
         with run_context("search_files") as run_id, open_cache(cache_path) as cache:

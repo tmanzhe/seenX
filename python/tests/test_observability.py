@@ -6,9 +6,9 @@ import os
 import tempfile
 import unittest
 
-from observability import (CURRENT_RUN, configure_logging, count, event,
+from seenx.observability import (CURRENT_RUN, configure_logging, count, event,
                            file_id, observed_search, run_context, stage)
-from record_cache import get_record, open_cache, save_record
+from seenx.record_cache import get_record, open_cache, save_record
 
 
 class ObservabilityTests(unittest.TestCase):
