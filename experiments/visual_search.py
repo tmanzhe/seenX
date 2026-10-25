@@ -3,6 +3,7 @@
 import argparse
 from importlib.metadata import version
 import math
+import logging
 from pathlib import Path
 import sqlite3
 from time import perf_counter
@@ -10,6 +11,7 @@ from time import perf_counter
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 from record_cache import get_record, open_cache, save_record
+from observability import configure_logging, count, event, file_id, run_context, stage
 
 
 MODEL_ID = "openai/clip-vit-base-patch32"
@@ -24,7 +26,19 @@ def filter_visual_matches(matches: list, min_score: float = DEFAULT_MIN_SCORE) -
     """Reject weak similarities; this cutoff is a heuristic, not confidence."""
     if not math.isfinite(min_score) or not -1 <= min_score <= 1:
         raise ValueError("--min-score must be a finite cosine score between -1 and 1")
-    return [match for match in matches if match["score"] >= min_score]
+    kept = [match for match in matches if match["score"] >= min_score]
+    if matches:
+        count("visual_candidates", len(matches))
+        count("visual_accepted", len(kept))
+        count("visual_rejected", len(matches) - len(kept))
+        event("visual_filter", cutoff=min_score, candidates=len(matches), accepted=len(kept),
+              rejected=len(matches) - len(kept), best_score=max(match["score"] for match in matches))
+        for match in matches:
+            event("visual_decision", level=logging.DEBUG,
+                  file_id=file_id(match["path"]) if "path" in match else None,
+                  cosine=match["score"], cutoff=min_score,
+                  decision="accepted" if match["score"] >= min_score else "below_cutoff")
+    return kept
 
 
 def normalize_vector(values: list) -> list:
@@ -103,9 +117,10 @@ def collect_embeddings(folder: Path, encoder, limit: int, cache=None,
             state = path.stat()
             record = get_record(cache, path, encoder.cache_key, state)
             if record is None:
-                with Image.open(path) as source:
-                    source.load()
-                    embedding = encoder.encode_image(source)
+                with stage("image_embedding", file_id=file_id(path)):
+                    with Image.open(path) as source:
+                        source.load()
+                        embedding = encoder.encode_image(source)
                 after = path.stat()
                 if (state.st_mtime_ns, state.st_size) != (after.st_mtime_ns, after.st_size):
                     raise OSError("File changed during encoding; retry next run")
@@ -114,7 +129,10 @@ def collect_embeddings(folder: Path, encoder, limit: int, cache=None,
             else:
                 reused += 1
             records.append(record)
+            count("image_vectors_loaded")
         except (UnidentifiedImageError, OSError, Image.DecompressionBombError, ValueError) as error:
+            count("files_skipped")
+            event("file_skipped", level=logging.WARNING, stage="visual", file_id=file_id(path), error_type=type(error).__name__)
             print(f"Skipped {path.name}: {error}")
         if len(records) >= limit:
             break
@@ -132,6 +150,8 @@ def main() -> None:
                         help="Minimum visual cosine similarity (default: 0.25; not a probability)")
     parser.add_argument("--cache", action="store_true", help="Save and reuse image embeddings locally")
     parser.add_argument("--download-model", action="store_true", help="Allow downloading pinned model files (otherwise offline)")
+    parser.add_argument("--debug", action="store_true", help="Include per-file cache and score decisions in local logs")
+    parser.add_argument("--no-log", action="store_true", help="Disable persistent local logs")
     args = parser.parse_args()
     folder = args.folder.expanduser().resolve()
     if not folder.is_dir():
@@ -148,20 +168,31 @@ def main() -> None:
         parser.error("No supported image files found; PDFs are not searched by this command")
 
     try:
-        started = perf_counter()
-        print(f"Loading {MODEL_ID} at {MODEL_REVISION} on CPU...", flush=True)
-        encoder = ClipEncoder(download=args.download_model)
-        loaded = perf_counter()
-        cache_path = Path(__file__).resolve().parent / ".cache" / "records.sqlite3" if args.cache else None
-        with open_cache(cache_path) as cache:
-            records = collect_embeddings(folder, encoder, args.limit, cache)
-        indexed = perf_counter()
-        if not records:
-            parser.exit(1, "No readable images were indexed.\n")
-        query_vector = encoder.encode_text(args.query)
-        ranked = rank_images(records, query_vector, len(records))
-        results = filter_visual_matches(ranked, args.min_score)[:args.top_k]
-        searched = perf_counter()
+        configure_logging(enabled=not args.no_log, debug=args.debug)
+        with run_context("visual_search") as run_id:
+            print(f"Run ID: {run_id}")
+            event("search_settings", mode="visual", cache_enabled=args.cache, limit=args.limit,
+                  top_k=args.top_k, cutoff=args.min_score, query_characters=len(args.query))
+            started = perf_counter()
+            print(f"Loading {MODEL_ID} at {MODEL_REVISION} on CPU...", flush=True)
+            with stage("model_load"):
+                encoder = ClipEncoder(download=args.download_model)
+            event("model_ready", model_id=MODEL_ID, model_revision=MODEL_REVISION, reused_instance=False)
+            loaded = perf_counter()
+            cache_path = Path(__file__).resolve().parent / ".cache" / "records.sqlite3" if args.cache else None
+            with open_cache(cache_path) as cache, stage("visual_index"):
+                records = collect_embeddings(folder, encoder, args.limit, cache)
+            indexed = perf_counter()
+            if not records:
+                parser.exit(1, "No readable images were indexed.\n")
+            with stage("query_embedding"):
+                query_vector = encoder.encode_text(args.query)
+            with stage("visual_ranking"):
+                ranked = rank_images(records, query_vector, len(records))
+            results = filter_visual_matches(ranked, args.min_score)[:args.top_k]
+            count("results_returned", len(results))
+            event("search_results", returned=len(results), score_kind="cosine")
+            searched = perf_counter()
     except (ImportError, OSError, RuntimeError, ValueError, sqlite3.Error) as error:
         parser.exit(1, f"Visual search failed: {error}\nFor a first run, install .[visual] and use --download-model.\n")
 

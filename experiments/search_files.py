@@ -1,14 +1,16 @@
 """Search one local collection with text, visual similarity, or both."""
 
 import argparse
+import logging
 from pathlib import Path
 import sqlite3
 
 from image_ocr import check_ocr_available
 from load_images import normalize_text, read_folder, search_text
 from record_cache import open_cache
-from visual_search import (ClipEncoder, DEFAULT_MIN_SCORE, EXTENSIONS,
+from visual_search import (ClipEncoder, DEFAULT_MIN_SCORE, EXTENSIONS, MODEL_ID, MODEL_REVISION,
                            collect_embeddings, filter_visual_matches, rank_images)
+from observability import configure_logging, count, event, file_id, observed_search, run_context, stage
 
 FUSION_SMOOTHING = 60
 
@@ -56,10 +58,14 @@ def fuse_results(text_matches: list, visual_matches: list, top_k: int,
 
 def select_paths(folder: Path, mode: str, limit: int) -> list:
     extensions = EXTENSIONS if mode == "visual" else EXTENSIONS | {".pdf"}
-    return [path for path in sorted(folder.iterdir())
-            if path.is_file() and path.suffix.lower() in extensions][:limit]
+    supported = [path for path in sorted(folder.iterdir())
+                 if path.is_file() and path.suffix.lower() in extensions]
+    event("candidate_selection", supported=len(supported), selected=min(len(supported), limit),
+          beyond_limit=max(0, len(supported) - limit))
+    return supported[:limit]
 
 
+@observed_search
 def search_files(folder: Path, query: str, mode: str = "hybrid", ocr: bool = False,
                  limit: int = 10, top_k: int = 5, cache=None,
                  download: bool = False, encoder=None,
@@ -72,6 +78,9 @@ def search_files(folder: Path, query: str, mode: str = "hybrid", ocr: bool = Fal
     if not normalize_text(query) or limit < 1 or top_k < 1:
         raise ValueError("Query must not be blank; limit and top_k must be positive")
     filter_visual_matches([], min_score)
+    event("search_settings", mode=mode, ocr=ocr, cache_enabled=cache is not None,
+          limit=limit, top_k=top_k, cutoff=min_score, query_characters=len(query),
+          filename_search=False, text_matching="literal_phrase")
     if mode == "visual" and ocr:
         raise ValueError("--ocr is for text and hybrid modes")
     if mode == "text" and download:
@@ -79,6 +88,9 @@ def search_files(folder: Path, query: str, mode: str = "hybrid", ocr: bool = Fal
     paths = select_paths(folder, mode, limit)
     if not paths:
         raise ValueError("No supported files in the selected folder")
+    count("selected_files", len(paths))
+    event("files_selected", count=len(paths), images=sum(path.suffix.lower() in EXTENSIONS for path in paths),
+          pdfs=sum(path.suffix.lower() == ".pdf" for path in paths))
     print(f"Scanning {len(paths)} candidate file(s); mode={mode}. These are not result counts.")
     text_matches = []
     visual_matches = []
@@ -88,27 +100,53 @@ def search_files(folder: Path, query: str, mode: str = "hybrid", ocr: bool = Fal
             check_ocr_available()
         else:
             print("Image text is excluded; add --ocr to recognize it.")
-        records = read_folder(folder, len(paths), ocr, cache, paths=paths, show_summaries=False)
+        with stage("text_index"):
+            records = read_folder(folder, len(paths), ocr, cache, paths=paths, show_summaries=False)
         readable = bool(records)
-        text_matches = search_text(records, query)
+        with stage("text_query"):
+            text_matches = search_text(records, query)
+        pdf_matches = sum(match["page"] is not None for match in text_matches)
+        count("text_matches", len(text_matches))
+        event("text_matches", total=len(text_matches), pdf_pages=pdf_matches,
+              ocr_images=len(text_matches) - pdf_matches, filename_search=False)
+        print(f"Text branch: {pdf_matches} PDF page(s), {len(text_matches) - pdf_matches} OCR image(s) matched the literal phrase. Filenames are not searched.")
     if mode in {"visual", "hybrid"}:
         image_paths = [path for path in paths if path.suffix.lower() in EXTENSIONS]
         if image_paths:
+            reused_instance = encoder is not None
             if encoder is None:
                 print("Loading local CLIP model...", flush=True)
-                encoder = ClipEncoder(download=download)
-            vectors = collect_embeddings(folder, encoder, len(image_paths), cache, paths=image_paths)
+                with stage("model_load"):
+                    encoder = ClipEncoder(download=download)
+            event("model_ready", reused_instance=reused_instance,
+                  model_id=MODEL_ID, model_revision=MODEL_REVISION)
+            with stage("visual_index"):
+                vectors = collect_embeddings(folder, encoder, len(image_paths), cache, paths=image_paths)
             readable = readable or bool(vectors)
             if vectors:
                 # Fuse all candidates before applying the final result limit.
-                ranked = rank_images(vectors, encoder.encode_text(query), len(vectors))
+                with stage("query_embedding"):
+                    query_vector = encoder.encode_text(query)
+                with stage("visual_ranking"):
+                    ranked = rank_images(vectors, query_vector, len(vectors))
                 visual_matches = filter_visual_matches(ranked, min_score)
                 print(f"Visual cutoff {min_score:g}: kept {len(visual_matches)} of {len(ranked)} candidate image(s).")
+                print("Visual results are CLIP suggestions; they do not mean the query words appear in the image.")
         else:
             print("No images selected for the visual branch; searching PDF text only.")
     if not readable:
         raise ValueError("No selected files could be read")
-    return fuse_results(text_matches, visual_matches, top_k, mode)
+    with stage("fusion"):
+        results = fuse_results(text_matches, visual_matches, top_k, mode)
+    count("results_returned", len(results))
+    event("search_results", returned=len(results), text_candidates=len(text_matches),
+          visual_candidates=len(visual_matches),
+          score_kind={"hybrid": "rank-fusion", "visual": "cosine", "text": "exact-match"}[mode])
+    for rank, result in enumerate(results, start=1):
+        event("result_ranked", level=logging.DEBUG, file_id=file_id(result["path"]),
+              rank=rank, page=result["page"], score=result["score"], score_kind=result["score_kind"],
+              methods=[item["method"] for item in result["evidence"]])
+    return results
 
 
 def main() -> None:
@@ -123,10 +161,14 @@ def main() -> None:
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--min-score", type=float, default=DEFAULT_MIN_SCORE,
                         help="Minimum visual cosine before fusion (default: 0.25); does not filter exact text matches")
+    parser.add_argument("--debug", action="store_true", help="Include per-file cache and score decisions in local logs")
+    parser.add_argument("--no-log", action="store_true", help="Disable persistent local logs")
     args = parser.parse_args()
     cache_path = Path(__file__).resolve().parent / ".cache" / "records.sqlite3" if args.cache else None
     try:
-        with open_cache(cache_path) as cache:
+        configure_logging(enabled=not args.no_log, debug=args.debug)
+        with run_context("search_files") as run_id, open_cache(cache_path) as cache:
+            print(f"Run ID: {run_id}")
             results = search_files(
                 args.folder, args.query, mode=args.mode, ocr=args.ocr,
                 limit=args.limit, top_k=args.top_k, cache=cache,
@@ -135,8 +177,10 @@ def main() -> None:
     except (ValueError, RuntimeError, ImportError, OSError, sqlite3.Error) as error:
         parser.exit(1, f"Search failed: {error}\n")
     print("Results (scores are ranking signals, not probabilities):")
+    labels = {"pdf-text": "literal PDF text match", "image-ocr": "literal OCR text match",
+              "clip-visual": "CLIP visual suggestion"}
     for number, result in enumerate(results, start=1):
-        methods = ", ".join(item["method"] for item in result["evidence"])
+        methods = ", ".join(labels[item["method"]] for item in result["evidence"])
         location = f"page {result['page']}" if result["page"] is not None else "image"
         print(f"  {number}. {result['path']} — {location}")
         print(f"     {result['score_kind']}={result['score']:.6f}; evidence: {methods}")

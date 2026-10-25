@@ -1,6 +1,7 @@
 """Inspect images and PDFs without modifying the original files."""
 
 import argparse
+import logging
 from pathlib import Path
 import sqlite3
 
@@ -10,6 +11,7 @@ from pypdf.errors import PyPdfError
 
 from image_ocr import check_ocr_available, extract_image_text
 from record_cache import get_record, open_cache, reader_key, save_record
+from observability import count, event, file_id, stage
 
 
 def inspect_image(path: Path, ocr: bool = False) -> dict:
@@ -25,10 +27,13 @@ def inspect_image(path: Path, ocr: bool = False) -> dict:
         }
         if ocr:
             try:
-                record["text"] = extract_image_text(source)
+                with stage("ocr", file_id=file_id(path)):
+                    record["text"] = extract_image_text(source)
                 record["text_method"] = "apple-vision-ocr"
             except RuntimeError as error:
                 record["ocr_error"] = str(error)
+                count("ocr_errors")
+                event("ocr_failed", level=logging.WARNING, file_id=file_id(path), error_type=type(error).__name__)
         return record
 
 
@@ -103,21 +108,25 @@ def read_folder(folder: Path, limit: int, ocr: bool, cache=None, refresh: bool =
             if record is not None:
                 reused += 1
             else:
-                if suffix == ".pdf":
-                    record = inspect_pdf(path)
-                else:
-                    record = inspect_image(path, ocr=ocr)
+                with stage("text_extraction", file_id=file_id(path), kind="pdf" if suffix == ".pdf" else "image"):
+                    if suffix == ".pdf":
+                        record = inspect_pdf(path)
+                    else:
+                        record = inspect_image(path, ocr=ocr)
                 after = path.stat()
                 if (state.st_mtime_ns, state.st_size) != (after.st_mtime_ns, after.st_size):
                     raise OSError("File changed during reading; retry on the next run")
                 save_record(cache, path, key, state, record)
             records.append(record)
+            count("text_records_loaded")
             if show_summaries:
                 print_summary(record)
             elif "ocr_error" in record:
                 print(f"OCR failed for {path.name}: {record['ocr_error']}")
         except (UnidentifiedImageError, OSError, Image.DecompressionBombError,
                 PyPdfError, ValueError, NotImplementedError) as error:
+            count("files_skipped")
+            event("file_skipped", level=logging.WARNING, stage="text", file_id=file_id(path), error_type=type(error).__name__)
             print(f"Skipped {path.name}: {error}")
         if len(records) >= limit:
             break

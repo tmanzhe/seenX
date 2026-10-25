@@ -60,12 +60,14 @@ experiments/.venv/bin/python experiments/load_images.py practice-images
 | `record_cache.py` | Stores and retrieves extracted records with Python's built-in SQLite support. |
 | `visual_search.py` | A separate command for matching image contents against a text description. |
 | `search_files.py` | The combined search command and reusable search function. Start with step 8 to try all modes. |
+| `observability.py` | Local structured logs, run IDs, counters, and stage timers. |
 | `test_search.py`, `test_ocr.py`, `test_cache.py` | Repeatable checks for matching, OCR, and cache behavior. |
 | `pyproject.toml` | The Python version requirement and dependencies. |
 | `.venv/` | The interpreter and installed packages. Generated locally and ignored by Git. |
 | `../practice-images/` | Your original files. Ignored by Git. |
 | `data/`, `outputs/` | Empty leftovers from an early smoke check. The script doesn't use them. |
 | `.cache/records.sqlite3` | Optional local database created by `--cache`. Contains extracted text and paths; ignored by Git. |
+| `.cache/logs/search.jsonl` | Local diagnostic events, rotated by size and ignored by Git. |
 | `../models/huggingface/` | Downloaded model files. Local and ignored by Git. |
 
 The script doesn't save converted images, thumbnails, or a manifest. Your originals are opened for reading. Without `--cache`, extracted text stays in memory for this run. With `--cache`, text and file paths are saved in the local database. Extracted contents aren't printed. Personal files, cache databases, model downloads, and future experiment outputs should stay out of Git.
@@ -460,6 +462,60 @@ In hybrid mode, exact text matches don't need to pass the visual cutoff. For exa
 The combined search command also stopped printing a metadata summary for every scanned file. It now distinguishes candidate counts and cache statistics from the final `Found ... result(s)` count. The original learning command still prints metadata so you can inspect file reading. OCR failures are reported even when normal metadata summaries are hidden.
 
 Regression checks cover the basketball/laptop score examples, zero matches, multiple accepted matches, inclusive cutoff boundaries, invalid thresholds, filtering before fusion, and preserving text-only evidence. The suite passed 36 tests, and real offline hybrid runs returned one basketball result, one laptop result, and zero submarine results. Multiple images may still be returned when they pass the cutoff; we haven't hardcoded a single result or special query words.
+
+### 10. Understand a run with logging
+
+We needed a way to answer "what happened?" without guessing from the final result list. Both the combined search command and the standalone visual command now write local structured logs. We use Python's built-in logging rather than adding a monitoring service at this stage. Nothing is exported to a cloud telemetry endpoint by this code.
+
+**Logging** records events: a model loaded, a file was skipped, a cache lookup missed. **Metrics** are measurements such as result counts, cache hits, and elapsed milliseconds. **Observability** is using those signals to understand what the program did. Recording these signals doesn't improve relevance by itself; labeled examples are still how we check accuracy.
+
+```sh
+python search_files.py ../practice-images --mode hybrid --ocr --cache --query "your phrase" --debug
+```
+
+Each run prints its ID. Events saved under `.cache/logs/search.jsonl` have the same ID, a UTC timestamp, a severity level, and an event name. JSONL means one JSON object per line. From the repository root, inspect recent events with:
+
+```sh
+tail -n 20 experiments/.cache/logs/search.jsonl
+```
+
+Normal logs include settings, candidate counts, exact text match counts, stage durations, cutoff totals, and a final summary. `--debug` adds cache decisions and individual image cosine scores with acceptance/rejection reasons. File identifiers are hashed with the run ID, so they correlate events for a file within that run without saving its full path. The saved logs omit raw queries, extracted text, vectors, full source paths, and exception messages. They retain query length, numeric scores, error types, and model identity. The terminal still displays matching paths and readable error messages.
+
+The important events are:
+
+| Event | What it helps answer |
+| --- | --- |
+| `search_settings` | Which mode, OCR setting, cutoff, and limits were used? |
+| `candidate_selection` | Were supported files excluded by the file limit? |
+| `cache_hit` / `cache_miss` | Did we reuse extraction, and why not? Detailed events require debug mode. |
+| `text_matches` | How many PDF pages and OCR images contain the literal phrase? |
+| `stage_finished` | How long did model load, extraction, query encoding, ranking, or fusion take? |
+| `visual_filter` | What was the best similarity, and how many candidates passed the cutoff? |
+| `visual_decision` | What happened to one image's score? Requires debug mode. |
+| `file_skipped` / `ocr_failed` | Did a read or recognition fail? |
+| `run_finished` / `run_failed` | What was the final result, timing, and set of counters? |
+
+Stages can contain other stages: OCR sits inside text extraction, for example. Their durations overlap, so adding all stage durations would double-count work. The run's total duration is recorded independently. A run may finish successfully after skipping an unreadable file; its counters preserve that partial failure.
+
+Cache misses distinguish `not_cached`, `reader_variant_missing` (another mode or version has a record), `source_changed`, and `invalid_record`. Malformed JSON cache entries are treated as misses so successful extraction can replace them. A corrupt SQLite database itself is reported as an error rather than silently deleted.
+
+The log rotates at about 1 MiB with three backups, keeping roughly 4 MiB rather than growing forever. This is size-based retention, not a time-based guarantee. Rotating files are intended for our current local CLI workflow, not simultaneous writers from multiple server processes. Disable persistent diagnostics with `--no-log`; that does not disable `--cache`. Likewise, caching can be off while logging is on. The original file-inspection teaching command doesn't configure persistent logs by itself.
+
+We tested JSON formatting, run correlation, context cleanup after exceptions, private-field omission, rotation, disabled logging, and cache miss reasons. The full suite passed 42 tests. Real runs confirmed the different branch counts in the "bloodwork" and "test" examples without logging document contents.
+
+#### Why a filename word can return nothing
+
+The text branch currently searches a normalized literal phrase inside extracted contents. It does not search filenames or understand PDF topics through embeddings. A word present only in the filename therefore won't match. An image returned by CLIP is a visual suggestion, not proof that the query word was read inside it.
+
+In hybrid mode a rank-one contribution is `1 / 61`, or about `0.016393`. A PDF text match and a visual suggestion can therefore have identical fusion scores while having completely different reasons for retrieval. The terminal now spells those reasons out. A higher fusion score still isn't a probability.
+
+#### Does the cache remember forever?
+
+There is no expiry timer today. Saved extraction results survive Python exits and Mac restarts until you delete the database or a matching row is replaced. They aren't learned model weights. Each new scan checks file size, modification time, and reader identity; changes cause fresh extraction. Query embeddings are still recomputed, and a new CLI process still loads model weights into memory even when image embeddings are cached.
+
+If a source is removed from the folder, it stops appearing in results on the next scan. Its old row can remain on disk until the cache is cleared. Downloaded model files are stored separately from extracted text/vectors. Clearing the extraction database doesn't uninstall the model, and log rotation doesn't clear either cache. This is why "saved", "fresh", and "still present on disk" are separate questions.
+
+References: [Python logging](https://docs.python.org/3/howto/logging.html) and [OpenTelemetry's description of telemetry signals](https://opentelemetry.io/docs/concepts/signals/). OpenTelemetry is a possible later integration when we have a running service; we haven't installed its SDK or a collector.
 
 ## Reading the rest of the script
 
