@@ -9,8 +9,11 @@ description = "Python learning and retrieval proofs of concept for seenX"
 requires-python = ">=3.13"
 dependencies = ["Pillow>=12.0,<13", "pypdf>=6,<7"]
 
+[project.optional-dependencies]
+ocr = ["pyobjc-framework-Vision>=11,<13; sys_platform == 'darwin'"]
+
 [tool.setuptools]
-py-modules = ["load_images"]
+py-modules = ["load_images", "image_ocr"]
 
 [tool.uv]
 package = false

@@ -7,18 +7,27 @@ from PIL import Image, UnidentifiedImageError
 from pypdf import PdfReader
 from pypdf.errors import PyPdfError
 
+from image_ocr import check_ocr_available, extract_image_text
 
-def inspect_image(path: Path) -> dict:
+
+def inspect_image(path: Path, ocr: bool = False) -> dict:
     with Image.open(path) as source:
         source.load()
         width, height = source.size
-        return {
+        record = {
             "path": str(path),
             "kind": "image",
             "format": source.format,
             "width": width,
             "height": height,
         }
+        if ocr:
+            try:
+                record["text"] = extract_image_text(source)
+                record["text_method"] = "apple-vision-ocr"
+            except RuntimeError as error:
+                record["ocr_error"] = str(error)
+        return record
 
 
 def inspect_pdf(path: Path) -> dict:
@@ -38,6 +47,10 @@ def print_summary(record: dict) -> None:
     name = Path(record["path"]).name
     if record["kind"] == "image":
         print(f"{name}: {record['width']} × {record['height']} ({record['format']})")
+        if "ocr_error" in record:
+            print(f"  OCR failed: {record['ocr_error']}")
+        elif "text" in record:
+            print(f"  OCR: {len(record['text'])} recognized character(s)")
     elif record["kind"] == "pdf":
         print(f"{name}: {len(record['pages'])} page(s) (PDF)")
         for page in record["pages"]:
@@ -54,17 +67,19 @@ def normalize_text(text: str) -> str:
     return " ".join(text.casefold().split())
 
 
-def search_pdf_text(records: list, query: str) -> list:
+def search_text(records: list, query: str) -> list:
     phrase = normalize_text(query)
     if not phrase:
         raise ValueError("Search phrase must contain non-whitespace characters")
     matches = []
     for record in records:
-        if record["kind"] != "pdf":
-            continue
-        for page in record["pages"]:
-            if phrase in normalize_text(page["text"]):
-                matches.append({"path": record["path"], "page": page["number"]})
+        if record["kind"] == "image":
+            if phrase in normalize_text(record.get("text", "")):
+                matches.append({"path": record["path"], "page": None})
+        elif record["kind"] == "pdf":
+            for page in record["pages"]:
+                if phrase in normalize_text(page["text"]):
+                    matches.append({"path": record["path"], "page": page["number"]})
     return matches
 
 
@@ -72,7 +87,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("folder", type=Path, help="Folder containing images and PDFs")
     parser.add_argument("--limit", type=int, default=10)
-    parser.add_argument("--query", help="Phrase to search for in extracted PDF text")
+    parser.add_argument("--query", help="Phrase to search for in extracted text")
+    parser.add_argument("--ocr", action="store_true", help="Recognize image text locally (macOS)")
     args = parser.parse_args()
     folder = args.folder.expanduser().resolve()
     if not folder.is_dir():
@@ -81,6 +97,11 @@ def main() -> None:
         parser.error("--limit must be positive")
     if args.query is not None and not normalize_text(args.query):
         parser.error("--query must contain non-whitespace characters")
+    if args.ocr:
+        try:
+            check_ocr_available()
+        except RuntimeError as error:
+            parser.error(str(error))
 
     records = []
     extensions = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"}
@@ -93,7 +114,7 @@ def main() -> None:
             if suffix == ".pdf":
                 record = inspect_pdf(path)
             elif suffix in extensions:
-                record = inspect_image(path)
+                record = inspect_image(path, ocr=args.ocr)
             records.append(record)
             print_summary(record)
         except (UnidentifiedImageError, OSError, Image.DecompressionBombError,
@@ -106,11 +127,15 @@ def main() -> None:
     if not records:
         parser.exit(1, "No supported, readable files found. Try PNG, JPEG, or PDF files.\n")
     if args.query is not None:
-        matches = search_pdf_text(records, args.query)
-        print("PDF text search (images are not searched yet):")
+        matches = search_text(records, args.query)
+        if not args.ocr:
+            print("PDF text search (use --ocr to also search image text):")
+        else:
+            print("PDF and image text search (scanned PDF OCR is not implemented):")
         for match in matches:
-            print(f"  {match['path']} — page {match['page']}")
-        print(f"Found {len(matches)} matching page(s).")
+            location = f"page {match['page']}" if match["page"] is not None else "image"
+            print(f"  {match['path']} — {location}")
+        print(f"Found {len(matches)} match(es).")
 
 
 if __name__ == "__main__":
