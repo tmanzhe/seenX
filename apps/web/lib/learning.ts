@@ -1,5 +1,5 @@
 // Keep the shared build journal here. Personal reflections stay in the browser.
-export const learningUpdated = "2026-10-24";
+export const learningUpdated = "2026-10-25";
 
 export const buildJournal = [
   {
@@ -18,16 +18,16 @@ export const buildJournal = [
   },
   {
     id: "experiment-first",
-    kind: "Next milestone",
+    kind: "Implemented baseline",
     title: "Try semantic search in Python first.",
-    detail: "Python is the learning and proof-of-concept stage for retrieval, OCR, metadata, and ontology. Rust implementation follows measured results; SwiftUI comes later. Start with one pretrained CLIP baseline and a notebook showing the top five matches.",
+    detail: "Python now has file readers, OCR, cached extraction, and a pinned CLIP baseline. One command supports text, visual, and hybrid search. Visual candidates must pass a configurable similarity cutoff. Rust implementation follows measured results; a local interface comes after useful retrieval.",
     takeaway: "A useful experiment answers a specific question. It does not need the desktop app, a database, or a Rust bridge.",
   },
   {
     id: "real-images",
     kind: "Evaluation decision",
     title: "Use my own images, starting with ten.",
-    detail: "A real image collection is available; its folder path has not been selected yet. There is no need to generate sample images. Start with ten files to check the pipeline, then use 50–200 mixed images for evaluation.",
+    detail: "The ignored practice-images folder contains our own images and a PDF. There is no need to generate sample images. The initial collection checks the pipeline; a larger labeled collection is still needed to measure retrieval quality.",
     takeaway: "Write descriptions and acceptable matches before inspecting search results. Include difficult screenshot queries that may need OCR.",
   },
   {
@@ -35,7 +35,7 @@ export const buildJournal = [
     kind: "Working agreement",
     title: "Understand one step before adding the next.",
     detail: "The full plan felt like too much at once. The agreed pace is to explain the next idea, make one small change, inspect it together, and pause for review and approval before continuing.",
-    takeaway: "Understanding the change is part of finishing the step. The isolated Python environment is configured; image loading and retrieval are still pending.",
+    takeaway: "Understanding the change is part of finishing the step. The Python README explains the current commands, caching, logging, and accuracy limits; the walkthrough follows each implementation step.",
   },
 ];
 
@@ -43,32 +43,32 @@ export const experimentSteps = [
   {
     title: "Set up the Python project",
     summary: "A separate place for the experiment and its dependencies.",
-    explanation: "A Python 3.13 virtual environment is configured inside experiments/. pyproject.toml records the project requirements. No third-party packages are installed yet. Add image loading first, then notebook and model dependencies in separate steps.",
-    done: "Completed: the environment runs Python and isolation is verified. Image and model dependencies follow later.",
+    explanation: "The Python project lives in python/, with source in src/seenx and separate tests. Run uv sync --project python --all-extras from the repository root. uv creates the isolated environment and installs the versions recorded in uv.lock. No manual activation is needed.",
+    done: "Implemented: Python 3.13.7, package entry points, and a locked uv environment. The Python README has the commands and folder map.",
   },
   {
     title: "Load ten of my images",
     summary: "See the inputs before asking a model to interpret them.",
-    explanation: "The notebook will find supported images and display thumbnails with filenames. practice-images/ is the ignored default folder. An empty folder should be explained clearly, and a corrupt file should be reported and skipped.",
-    done: "Ten readable images appear in the notebook, and we understand how their file paths become pixels.",
+    explanation: "seenx-inspect reads supported images and PDFs from the ignored practice-images folder. It prints dimensions, PDF page counts, and text availability without creating thumbnails. Unreadable files are reported and skipped.",
+    done: "Implemented and checked with eight images and a two-page PDF. Original files are only read.",
   },
   {
     title: "Load one pretrained model",
     summary: "Use a model that already knows how to relate images and text.",
-    explanation: "The baseline is openai/clip-vit-base-patch32 with its matching image processor and text tokenizer. We will download its assets into ignored models/, record the exact revision, and use Apple GPU acceleration when supported or CPU otherwise. This is inference, not training.",
+    explanation: "The baseline is openai/clip-vit-base-patch32 with its matching image processor and text tokenizer at a pinned revision. Assets live in ignored models/. The current baseline runs on CPU and was checked offline after download. This is inference, not training.",
     done: "The model loads locally and we know which revision and device we are using.",
   },
   {
     title: "Create the image embeddings",
     summary: "Represent each image as a list of numbers.",
-    explanation: "The image encoder produces a vector for each image. We will inspect one vector before processing the collection, normalize the vectors to length one, and keep them in memory for reuse across queries.",
+    explanation: "The image encoder produces a normalized vector for each image. Optional SQLite caching saves vectors between runs, checking file timestamps, size, and reader identity before reuse. Cached extraction does not change the model weights.",
     done: "Each readable image has a normalized embedding connected to the correct file path.",
   },
   {
     title: "Search with a description",
     summary: "Compare the query vector with every image vector.",
-    explanation: "The matching text encoder embeds the description. For normalized vectors, the dot product gives cosine similarity. We will sort the scores and show the top five thumbnails, filenames, and scores. A similarity score is not a confidence percentage.",
-    done: "Changing the description changes the results without recomputing the image embeddings.",
+    explanation: "The matching text encoder embeds the description. Cosine similarity ranks images, then a configurable cutoff rejects weaker suggestions. --top-k is a maximum rather than a requirement to fill five slots. The command prints paths and scores; a score is not confidence.",
+    done: "Implemented: text, visual, and hybrid modes with source-method explanations. Cached image vectors can be reused while each query is encoded again.",
   },
   {
     title: "Measure the results",
