@@ -2,7 +2,7 @@
 
 We're building a local file-search prototype, one useful piece at a time. The idea is to find a screenshot, photo, or document using something you remember about it. Python lets us try the pieces and understand the results before deciding what belongs in the Rust desktop engine.
 
-Right now we can open images and PDFs, recognize image text with optional local OCR on macOS, and search both kinds of text. An optional SQLite cache lets us reuse extracted records between runs. We haven't added embeddings or a Python web server. OCR uses Apple's pretrained text-recognition system; we aren't training a model. The Next.js website is a separate project under `apps/web`; this script isn't connected to it.
+Right now we can read images and PDFs, recognize image text with optional local OCR, search that text, and retrieve images by visual description using CLIP embeddings. An optional SQLite cache lets us reuse extracted records and image vectors between runs. We haven't added a Python web server. Both OCR and visual search use pretrained models; we aren't training them. The Next.js website is a separate project under `apps/web`; these scripts aren't connected to it.
 
 ## Get it running
 
@@ -58,12 +58,14 @@ experiments/.venv/bin/python experiments/load_images.py practice-images
 | `load_images.py` | The Python script. Despite the name, it now supports PDFs too. |
 | `image_ocr.py` | The small adapter between Python and Apple's Vision OCR framework. |
 | `record_cache.py` | Stores and retrieves extracted records with Python's built-in SQLite support. |
+| `visual_search.py` | A separate command for matching image contents against a text description. |
 | `test_search.py`, `test_ocr.py`, `test_cache.py` | Repeatable checks for matching, OCR, and cache behavior. |
 | `pyproject.toml` | The Python version requirement and dependencies. |
 | `.venv/` | The interpreter and installed packages. Generated locally and ignored by Git. |
 | `../practice-images/` | Your original files. Ignored by Git. |
 | `data/`, `outputs/` | Empty leftovers from an early smoke check. The script doesn't use them. |
 | `.cache/records.sqlite3` | Optional local database created by `--cache`. Contains extracted text and paths; ignored by Git. |
+| `../models/huggingface/` | Downloaded model files. Local and ignored by Git. |
 
 The script doesn't save converted images, thumbnails, or a manifest. Your originals are opened for reading. Without `--cache`, extracted text stays in memory for this run. With `--cache`, text and file paths are saved in the local database. Extracted contents aren't printed. Personal files, cache databases, model downloads, and future experiment outputs should stay out of Git.
 
@@ -272,6 +274,75 @@ This is an extraction cache, not a database search engine. Search still uses the
 
 The cache tests use temporary placeholder files and invented records. They check persistence after reopening, changed file size and timestamps, reader changes, forced refresh, OCR failures, files removed from the folder, and files changing during extraction. They don't create image fixtures or commit personal data.
 
+### 7. Find pictures by what they show
+
+OCR can read the word "cat" in a screenshot, but a cat photo may contain no writing at all. For that we added a separate visual-search command. Keeping it separate makes it easy to compare visual retrieval with exact text matching before combining them.
+
+From `experiments`, activate the environment and install the optional model libraries:
+
+```sh
+python -m pip install -e ".[visual]"
+python visual_search.py ../practice-images --query "a photo of a laptop computer" --cache --download-model
+```
+
+The first run downloads the pinned model files from Hugging Face into `models/huggingface` at the repository root. The model weights are roughly 600 MB, in addition to the Python packages. Your images are processed locally and aren't uploaded. No generated images or thumbnails are saved.
+
+After the download, leave off `--download-model`:
+
+```sh
+python visual_search.py ../practice-images --query "a photo of a cat" --cache
+```
+
+The default is local-files-only model loading. If the model isn't downloaded, the command fails with instructions rather than silently downloading it. `--download-model` permits fetching missing model files; it doesn't upload the input collection. You can additionally set `HF_HUB_OFFLINE=1` and `TRANSFORMERS_OFFLINE=1` when checking an offline run.
+
+The command considers up to ten readable images in filename order and returns the top five. Change these with `--limit 100 --top-k 5`. It doesn't search PDFs or run OCR. PDF text search stays in the existing command. For now, each command is a separate experiment.
+
+#### What the model does
+
+We use `openai/clip-vit-base-patch32` at revision `c7244be81152024ce0e99ac8d2e373a8953d9f9a`, an explicit safetensors conversion revision in the original model repository. Pinning the revision keeps the downloaded weights and preprocessing configuration stable. We load safetensors weights explicitly rather than relying on automatic format selection. The actual installed dependency versions are also part of the embedding-cache identifier.
+
+CLIP has two matching **encoders**: one takes an image, the other takes text. Each produces an **embedding**, a list of numbers. In this model the list has 512 numbers. These aren't hand-written object tags, and individual positions don't have simple labels like "cat ears". The learned pattern lets us compare related images and descriptions.
+
+For images:
+
+```text
+original → correct orientation → RGB → model preprocessing → image encoder → vector
+```
+
+For a query:
+
+```text
+description → tokenizer → text encoder → query vector
+```
+
+The processor takes care of the model's expected image resizing, center crop, pixel normalization, and text tokenization. A **tokenizer** turns text into the numbered tokens the model accepts. Long descriptions are truncated to the model's 77-token input limit. We use the processor distributed with the same pinned model, rather than inventing preprocessing that might produce incompatible results. The center crop can lose content near the edges of an image; that's a retrieval limitation to inspect.
+
+We chose Hugging Face Transformers to load the matching model and processor, and PyTorch to execute the neural-network calculations. Everything currently runs on CPU for a straightforward baseline. GPU/Metal optimization is a later measurement, not a requirement for this small experiment.
+
+`model.eval()` selects evaluation behavior. `torch.inference_mode()` avoids recording information needed for training. Neither updates the model weights. Using existing learned weights is **inference**; changing them using training examples would be **training**.
+
+#### How similarity becomes a ranking
+
+We first normalize each vector to length one. For a small example, `[3, 4]` has length `sqrt(3² + 4²) = 5`, so its normalized form is `[0.6, 0.8]`.
+
+Then we multiply corresponding elements of the query and image vectors and add those products. That is a **dot product**. For unit-length vectors, it is also their **cosine similarity**. We sort the images from highest score to lowest and return at most `--top-k` results. Tied scores use file-path order for repeatability.
+
+The output includes scores and paths, not captions or automatically confirmed labels. A score isn't a probability that an image contains the object. Something ranks first even if the folder contains no cats. There is no calibrated no-match threshold yet. Try a description that matches an image you actually added, then compare unrelated descriptions and inspect the rankings.
+
+The `ClipEncoder` class keeps the model, processor, and library together in one object. `__init__` initializes that object, `self.model` stores its model, and its `encode_image()` and `encode_text()` methods use the same configuration. This is our first application class; you don't need classes to understand the earlier dictionary-based readers.
+
+`**inputs` passes a dictionary's entries as named function arguments. A tensor is PyTorch's numerical array; `.tolist()` converts a result into ordinary Python numbers we can save as JSON. The list comprehension in vector normalization applies the same division to every number. The `lambda` in sorting is a short function that supplies a result's sort key.
+
+With `--cache`, image vectors are saved using the existing SQLite cache. The key includes the model ID, exact revision, preprocessing version, CPU mode, and installed Pillow/PyTorch/Transformers versions. Changed files are re-encoded. Images removed from the folder aren't returned, though old cached rows remain until the database is removed. Query vectors are calculated on each run. Without `--cache`, image vectors aren't saved. The text cache and vector cache use different reader identifiers.
+
+Each command prints model-loading, indexing, and query durations separately. A cached command still starts Python and loads the model; its reported query time doesn't include that startup. For a later local API we could keep the model in memory between requests. Don't mistake a warm vector cache for a continuously running model service.
+
+The vector tests don't require model downloads. They check normalization, cosine scores, ranking, deterministic ties, result limits, and invalid or mismatched vectors. Those arithmetic checks don't prove the model understands your collection; we also need labeled visual queries and inspection of real results.
+
+Initial verification used our eight practice images on macOS with Python 3.13.7, PyTorch 2.14.1, Transformers 4.57.6, and Pillow 12.3.0, running on CPU. The query "a photo of a laptop computer" ranked the laptop product image first. We then disabled network connections during a local model/query run and confirmed all eight image vectors were reused without calling the image encoder. The full suite passed 20 tests. This is a pipeline smoke check, not a labeled accuracy benchmark or proof that cat queries work on a collection without cats.
+
+References: [CLIP model and processor documentation](https://huggingface.co/docs/transformers/v4.56.0/en/model_doc/clip), [pinned model revision](https://huggingface.co/openai/clip-vit-base-patch32/tree/c7244be81152024ce0e99ac8d2e373a8953d9f9a).
+
 ## Reading the rest of the script
 
 `main()` coordinates the work. Here's what its building blocks mean:
@@ -306,6 +377,16 @@ Start with **variables**, **strings and integers**, **functions and arguments**,
 
 For this latest step, search for:
 
+- `machine learning inference vs training`: why we can use a model without training one.
+- `image text embeddings CLIP`: why images and descriptions can be compared.
+- `vectors normalization cosine similarity dot product`: how we compute rankings.
+- `Python classes init self methods`: how we keep the encoder and processor together.
+- `Python list comprehensions`: applying an operation to every vector element.
+- `Python dictionary unpacking kwargs`: what `**inputs` does.
+- `Python sorted key lambda`: how we order scores and break ties.
+
+The caching step introduced:
+
 - `Python sqlite3 tutorial`: opening a local database, executing SQL, and committing writes.
 - `Python json dumps loads`: saving dictionaries as text and restoring them.
 - `Python pathlib stat st_mtime_ns st_size`: checking whether a source file changed.
@@ -339,7 +420,9 @@ Other concepts already used are `Python pathlib`, `Python argparse beginner`, `P
 
 ## What comes next
 
-We now have PDF and image text search with optional reuse of extracted records. Next we'll measure which queries it handles and where it fails before adding image embeddings for visual descriptions that don't depend on visible words. OCR for scanned PDFs is another separate step. Each feature gets its own verification and Git commit, separate from frontend changes.
+We now have exact text search and a separate visual-search baseline. Next we'll label expected results for a small set of queries and compare retrieval quality before combining the two approaches. OCR for scanned PDFs is another separate step. Each feature gets its own verification and Git commit, separate from frontend changes.
+
+The broader path is Python engine → useful retrieval → local interface/API → gradual Rust migration. A small FastAPI service could later keep the Python model loaded and expose stable result shapes to a local frontend. There is no API server yet, and the public website doesn't have access to your folders. We can replace individual engine responsibilities with Rust after comparing their outputs against the Python reference. The intended shipped desktop app should work without a Python interpreter.
 
 Later, we'll compare keyword and semantic retrieval on labeled queries, and test whether relationships such as receipts belonging to trips improve results. Models may propose relationships; evidence and user confirmation need to stay distinguishable. We will measure useful behavior before moving it into the Rust engine. Python is our development reference, not a required runtime for the intended desktop release.
 

@@ -2,7 +2,7 @@
 
 A local-first image search application for macOS, designed to find screenshots and saved images using visible text and natural-language descriptions.
 
-**Status:** a Next.js product/docs site, dependency-free Rust library scaffold, and Python prototype for PDF/image text search with optional macOS OCR and a local SQLite extraction cache are available. Desktop indexing, desktop search, and the native macOS app are not implemented yet. Start with the [Python walkthrough](experiments/README.md) to follow the current build step by step.
+**Status:** a Next.js product/docs site, dependency-free Rust library scaffold, and Python prototypes for text search, optional macOS OCR, local extraction caching, and CLIP visual image search are available. Desktop integration and the native macOS app are not implemented yet. Start with the [Python walkthrough](experiments/README.md) to follow the current build step by step.
 
 Planned capabilities:
 
@@ -12,7 +12,7 @@ Planned capabilities:
 - Combine keyword and semantic search with a native macOS interface.
 - Keep selected folders indexed as files change.
 
-The development path is Python first: learn and prototype OCR, embeddings, metadata, hybrid retrieval, and ontology. Measure the results, then implement proven behavior in Rust. Production should run without Python, using native inference libraries where needed. SwiftUI is a later interface, not the current focus.
+The development path is Python first: learn and prototype OCR, embeddings, metadata, hybrid retrieval, and ontology. Measure the results, connect a local interface/API when retrieval is useful, then gradually implement proven behavior in Rust behind a stable interface. Production should run without Python, using native inference libraries where needed. SwiftUI is a later interface, not the current focus.
 
 ## Repository structure
 

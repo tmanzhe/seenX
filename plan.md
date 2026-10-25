@@ -2,7 +2,7 @@
 
 ## Direction
 
-Learn and prototype in Python first. Measure useful behavior, then implement the proven pipeline in Rust. SwiftUI is a later interface, not the current focus. The website and Rust scaffold exist; Python setup and real retrieval are still pending.
+Learn and prototype in Python first. Measure useful behavior, connect a local interface when retrieval is useful, then gradually implement the proven pipeline in Rust. SwiftUI is a later interface, not the current focus. The website and Rust scaffold exist; Python file reading, OCR, keyword search, extraction caching, and the first visual-search experiment are implemented.
 
 ## 1. Python semantic-search proof of concept
 
@@ -26,6 +26,8 @@ Done when the comparison shows which relationships help and which introduce erro
 
 ## 4. Implement proven behavior in Rust
 
+Before migration, a small local API (potentially FastAPI) can connect a local interface to the Python prototype. Keep it separate from the public website and validate local-folder access deliberately. Stabilize result shapes and error behavior so individual engine components can later be replaced without redesigning the interface. No API server is implemented yet.
+
 Port small slices: discovery, catalog, metadata, OCR integration, embeddings, retrieval, and validated ontology behavior. Keep Python as the development reference. Reuse datasets, labels, model revisions, and preprocessing; compare outputs with documented numeric tolerances.
 
 Rust owns production orchestration and retrieval without a required Python interpreter or Python subprocess. Native inference libraries and platform adapters may execute model and OS operations. Validate a viable Rust integration before committing to a prototype-only runtime.
@@ -38,6 +40,6 @@ A Rust CLI can exercise real retrieval before desktop integration. SwiftUI later
 
 ## Immediate next step
 
-Select the practice-image folder and set up an isolated Python environment. Load ten images before downloading a model. Explain one concept, make one small change, inspect the output, and review together before expanding.
+Try visual queries against the practice images, label acceptable results before measuring retrieval quality, and compare them with OCR/keyword search. Keep the model revision and preprocessing fixed. Verify cached and offline runs. Explain the concepts as we go and document each feature before expanding toward the local interface.
 
 See the [architecture](docs/architecture.md), [experiments](experiments/README.md), and [README](README.md).

@@ -2,9 +2,11 @@
 
 ## Development path
 
-Python learning and proof of concept → measured behavior → Rust implementation → later SwiftUI and agent interfaces.
+Python learning and proof of concept → measured retrieval → local interface/API prototype → gradual Rust implementation → native macOS and agent interfaces.
 
-The website and Rust scaffold exist. Python experiments, indexing, inference, and desktop integration are pending.
+The website and Rust scaffold exist. Python supports image/PDF reading, local macOS OCR, keyword search, optional SQLite extraction caching, and a CLIP visual-search experiment. Desktop integration is pending.
+
+First make retrieval useful in Python. Then a local API, potentially FastAPI, can connect a local interface to the Python engine so we can try the whole workflow. There is no Python API server yet. The public product website remains separate: a hosted website can't simply read a user's local folders. We need a deliberate local integration before connecting it to personal files.
 
 ## Responsibilities
 
@@ -27,10 +29,10 @@ An optional ontology defines concepts and relationships. Recorded metadata, user
 
 ## Python-to-Rust handoff
 
-Use the same dataset manifests, labeled queries, model revision, and preprocessing. Compare retrieval and numeric results with documented tolerances, then measure resource use. Python remains a learning and evaluation reference rather than a shipped backend.
+Use the same dataset manifests, labeled queries, model revision, and preprocessing. Compare retrieval and numeric results with documented tolerances, then measure resource use. Migrate small responsibilities behind a stable interface rather than rewriting the whole app at once. Python remains a learning and evaluation reference rather than a required shipped backend.
 
 ## Later interfaces
 
 A Rust CLI can validate retrieval before SwiftUI. A read-only MCP adapter could expose selected files and evidence to agents after the engine works. A client's forwarding to remote models is a separate privacy boundary.
 
-See the [plan](../plan.md). Publication, licensing, distribution, and donations remain future work.
+See the [plan](../plan.md). The source repository is public; licensing, desktop distribution, and donations remain future work.
