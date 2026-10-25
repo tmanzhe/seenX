@@ -8,21 +8,41 @@ from pypdf import PdfReader
 from pypdf.errors import PyPdfError
 
 
-def inspect_image(path: Path) -> None:
+def inspect_image(path: Path) -> dict:
     with Image.open(path) as source:
         source.load()
         width, height = source.size
-        print(f"{path.name}: {width} × {height} ({source.format})")
+        return {
+            "path": str(path),
+            "kind": "image",
+            "format": source.format,
+            "width": width,
+            "height": height,
+        }
 
 
-def inspect_pdf(path: Path) -> None:
+def inspect_pdf(path: Path) -> dict:
     with path.open("rb") as stream:
         reader = PdfReader(stream)
         if reader.is_encrypted:
             raise ValueError("Encrypted PDFs are not supported yet")
-        print(f"{path.name}: {len(reader.pages)} page(s) (PDF)")
+        pages = []
         for number, page in enumerate(reader.pages, start=1):
             text = (page.extract_text() or "").strip()
+            pages.append({"number": number, "text": text})
+        return {"path": str(path), "kind": "pdf", "pages": pages}
+
+
+def print_summary(record: dict) -> None:
+    """Display metadata only; keep extracted document text out of the terminal."""
+    name = Path(record["path"]).name
+    if record["kind"] == "image":
+        print(f"{name}: {record['width']} × {record['height']} ({record['format']})")
+    elif record["kind"] == "pdf":
+        print(f"{name}: {len(record['pages'])} page(s) (PDF)")
+        for page in record["pages"]:
+            number = page["number"]
+            text = page["text"]
             if text:
                 print(f"  Page {number}: {len(text)} extracted text character(s)")
             else:
@@ -40,7 +60,7 @@ def main() -> None:
     if args.limit < 1:
         parser.error("--limit must be positive")
 
-    loaded = 0
+    records = []
     extensions = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"}
     # Sorting makes repeated runs process the same files in the same order.
     for path in sorted(folder.iterdir()):
@@ -49,18 +69,19 @@ def main() -> None:
             continue
         try:
             if suffix == ".pdf":
-                inspect_pdf(path)
+                record = inspect_pdf(path)
             elif suffix in extensions:
-                inspect_image(path)
-            loaded += 1
+                record = inspect_image(path)
+            records.append(record)
+            print_summary(record)
         except (UnidentifiedImageError, OSError, Image.DecompressionBombError,
                 PyPdfError, ValueError, NotImplementedError) as error:
             print(f"Skipped {path.name}: {error}")
-        if loaded >= args.limit:
+        if len(records) >= args.limit:
             break
 
-    print(f"Loaded {loaded} file(s).")
-    if not loaded:
+    print(f"Loaded {len(records)} file(s).")
+    if not records:
         parser.exit(1, "No supported, readable files found. Try PNG, JPEG, or PDF files.\n")
 
 
