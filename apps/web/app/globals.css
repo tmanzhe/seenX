@@ -902,3 +902,12 @@ body, .docs-site { background: var(--paper); color: var(--ink); }
 :root[data-theme="dark"] .docs-search-result strong, :root[data-theme="dark"] .notebook-text-button { color: var(--ink); }
 :root[data-theme="dark"] .docs-search-result:hover, :root[data-theme="dark"] .docs-search-result[data-selected="true"], :root[data-theme="dark"] .support-notice { background: var(--surface); }
 .use-case-grid article:hover, .measurement-grid article:hover, .docs-start-links a:hover { border-color: var(--accent); }
+
+/* Compact project checkpoint replaces repeated homepage explanations. */
+.project-checkpoint { display: grid; grid-template-columns: 1.3fr 1fr; gap: 70px; padding-top: 55px; padding-bottom: 65px; border-top: 1px solid var(--line); }
+.project-checkpoint h2 { font-size: 35px; line-height: 1.15; font-weight: 450; letter-spacing: -1px; margin: 18px 0; }
+.project-checkpoint p { color: var(--muted); font-size: 13px; line-height: 1.85; max-width: 440px; }
+.project-links { display: grid; align-content: center; }
+.project-links a { display: flex; justify-content: space-between; gap: 20px; padding: 18px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.project-links a:hover { color: var(--accent); }
+@media (max-width: 650px) { .project-checkpoint { grid-template-columns: 1fr; gap: 20px; padding-top: 40px; padding-bottom: 40px; } }
