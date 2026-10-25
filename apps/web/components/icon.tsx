@@ -15,6 +15,8 @@ const paths = {
   terminal: "m4 6 6 6-6 6m9 0h7",
   menu: "M4 7h16M4 12h16M4 17h16",
   monitor: "M3 3h18v14H3V3Zm5 18h8m-4-4v4",
+  region: "M8 3H3v5m13-5h5v5M3 16v5h5m8 0h5v-5M8 8h8v8H8Z",
+  plus: "M12 5v14M5 12h14",
 };
 
 export function Icon({ name, size = 20, style }: { name: keyof typeof paths; size?: number; style?: CSSProperties }) {

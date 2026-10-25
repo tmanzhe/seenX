@@ -35,7 +35,7 @@ export function LandingMotion() {
           observer.unobserve(entry.target);
         });
       }, { threshold: 0.08, rootMargin: "0px 0px -24px 0px" });
-      const observe = () => root.querySelectorAll(".hero-copy > *, .desktop-window, .image-card, .section-intro > *, .audience-tabs, .use-case-grid article, .use-case-bottom, .local-copy > *, .folder-stack > div, .index-node, .device-boundary, .faq-section > div:first-child, .faq-list details").forEach((element) => {
+      const observe = () => root.querySelectorAll(".hero-copy > *, .demo-intro > *, .desktop-window, .section-intro > *, .memory-steps-grid article, .use-case-grid article, .assistant-copy > *, .assistant-concept, .local-copy > *, .folder-stack > div, .index-node, .device-boundary, .faq-section > div:first-child, .faq-list details, .memory-closing > *").forEach((element) => {
         if (!seen.has(element)) observer.observe(element);
       });
       observe();

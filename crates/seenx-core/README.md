@@ -1,23 +1,27 @@
 # seenX core
 
-**Status:** the dependency-free Rust library scaffold builds. Cataloging, indexing, and retrieval are not implemented yet.
+**Status:** a dependency-free Rust library scaffold. A persistent catalog, indexing, search, ontology, API, and MCP implementation do not exist in this crate yet.
 
-This component will contain a reusable Rust engine for:
+## Production responsibilities
 
-- The persistent image catalog and indexing state.
-- Indexing decisions, work coordination, and incremental updates.
-- Keyword and semantic retrieval, metadata constraints, and ranking.
+- SQLite catalog and migrations for assets/revisions, sources, notes, OCR observations, point/region targets, indexing jobs, and collection grants.
+- Lightweight ontology: typed relationships with source provenance and explicit assertion/confirmation state.
+- FTS5 exact retrieval plus local visual/text vector retrieval and evidence-preserving rank fusion. Evaluate sqlite-vec against exact scanning before selecting a shipping vector index.
+- Incremental indexing, model/index revisions, source reconciliation, derived-data deletion, recovery, and export.
+- One retrieval/authorization contract shared by native human search and the read-only V1 MCP bridge.
 
-Platform-specific UI, permissions, and Apple APIs belong to the macOS app and its adapters. Keeping that boundary explicit will allow the engine to be exercised independently.
+Platform UI, screenshot capture, OS permissions, and native OCR/model adapters belong to the macOS boundary. Rust owns reusable memory and retrieval logic, not every platform API or model runtime implementation.
 
-The root `Cargo.toml` defines the workspace. This directory's `Cargo.toml` defines the library package, and `src/lib.rs` is its source entry point. The scaffold deliberately contains no application functions or third-party dependencies.
+## Development path
 
-From the repository root, check it offline:
+Use the existing Python implementation as the learning/evaluation reference. Stabilize real memory/annotation operations and local contracts first; begin native and MCP integration without waiting for the entire Rust migration. Port small measured slices using the same model revisions, preprocessing, labeled datasets, and result fixtures. The production target does not require a Python interpreter.
+
+No dependencies or APIs have been selected merely by documenting them here. Packaging, runtime compatibility, Swift bindings, access enforcement, and offline verification need working integration tests.
+
+From the repository root, validate the current scaffold with:
 
 ```sh
 cargo check --offline --workspace
 ```
 
-Feature implementation follows Python learning and measured proof-of-concept results. Then port small slices using the same evaluation queries. Rust owns production retrieval without a required Python interpreter, and may call native inference libraries or platform adapters. Package publication is disabled while the release and license are undecided.
-
-See the [architecture](../../docs/architecture.md) and [implementation plan](../../plan.md).
+Package publication is disabled while release and licensing decisions are unfinished. See [architecture](../../docs/architecture.md) and [the roadmap](../../plan.md).

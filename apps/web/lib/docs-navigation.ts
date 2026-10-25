@@ -9,16 +9,17 @@ export const docNavigation: DocGroup[] = [
   ] },
   { title: "Use cases", links: [
     { href: "/docs/personal-search", title: "For your own memory" },
-    { href: "/docs/agent-workflows", title: "For your AI agents" },
-    { href: "/docs/agents", title: "Agent integration" },
+    { href: "/docs/notes", title: "Notes & saved context" },
+    { href: "/docs/agent-workflows", title: "With your assistant" },
+    { href: "/docs/agents", title: "Assistant bridge · MCP" },
   ] },
   { title: "How it works", links: [
-    { href: "/docs/how-search-works", title: "Search & metadata" },
+    { href: "/docs/how-search-works", title: "Hybrid search & vectors" },
     { href: "/docs/privacy", title: "Privacy & local data" },
   ] },
   { title: "Reference", links: [
-    { href: "/docs/ontology", title: "Entities & relationships" },
-    { href: "/docs/architecture", title: "Architecture" },
+    { href: "/docs/ontology", title: "Memory ontology" },
+    { href: "/docs/architecture", title: "Stack & architecture" },
   ] },
   { title: "The project", links: [
     { href: "/docs/roadmap", title: "Roadmap" },

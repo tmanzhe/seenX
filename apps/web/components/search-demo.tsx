@@ -1,64 +1,91 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { DemoItem } from "../lib/demo";
-import { demoItems, searchDemo } from "../lib/demo";
+import { demoItems, searchDemo, type DemoItem } from "../lib/demo";
+import { isAnnotation, seedAnnotations, type AnnotationStore, type MemoryAnnotation } from "../lib/memory-annotations";
 import { Icon } from "./icon";
+import { MemoryArtwork } from "./memory-artwork";
+import { MemoryAnnotator } from "./memory-annotator";
 
-function Artwork({ item }: { item: DemoItem }) {
-  if (item.image) return <img src={item.image} alt={item.title} loading="lazy" />;
-  if (item.id === "terminal") return <div className="terminal-art"><div className="terminal-label">~/projects/another-good-idea</div><span className="terminal-green">$ npm run dev</span><br /><br /><span className="terminal-muted">connecting to localhost:5432…</span><br /><span className="terminal-red">Error: connection refused</span><br /><span className="terminal-muted">ECONNREFUSED 127.0.0.1:5432</span><br /><br /><span className="terminal-green">❯ <span className="cursor">_</span></span></div>;
-  return <div className="menu-art"><span className="menu-stamp">喫茶</span><strong>GOOD THINGS,<br />SLOWLY.</strong><span>THE LITTLE CAFÉ · SAMPLE MENU</span><div><span>Matcha latte</span><span>¥550</span></div><div><span>Pour-over coffee</span><span>¥480</span></div></div>;
-}
+const storageKey = "seenx-preview-annotations-v2";
+const captureKey = "seenx-preview-screenshot-v1";
+const captureItem: DemoItem = { ...demoItems[0], id: "capture-layout", title: "Your checkout screenshot", file: "your-checkout-capture.png", location: "Your captures", source: "Pretend screenshot · example.com/shop", note: "" };
+const availableItems = [...demoItems, captureItem];
 
 export function SearchDemo() {
   const [query, setQuery] = useState("");
-  const [collection, setCollection] = useState("all");
-  const [kind, setKind] = useState("all");
+  const [store, setStore] = useState<AnnotationStore>({});
   const [selected, setSelected] = useState<DemoItem | null>(null);
+  const [ready, setReady] = useState(false);
+  const [captured, setCaptured] = useState(false);
+  const [capturePreview, setCapturePreview] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
-  const results = searchDemo(query, collection, kind);
+  const notesFor = (item: DemoItem) => store[item.id] ?? seedAnnotations(item);
+  const searchableNotes = Object.fromEntries(availableItems.map((item) => [item.id, notesFor(item).map((note) => `${note.text} ${note.quote ?? ""}`).join(" ")]));
+  const results = searchDemo(query, "all", "all", searchableNotes, captured ? availableItems : demoItems);
 
   useEffect(() => {
-    const handler = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); searchRef.current?.focus(); }
+    try {
+      const raw = localStorage.getItem(storageKey);
+      const saved: unknown = JSON.parse(raw ?? "{}");
+      const restored: AnnotationStore = {};
+      if (saved && typeof saved === "object" && !Array.isArray(saved)) {
+        for (const item of availableItems) {
+          const entries = (saved as Record<string, unknown>)[item.id];
+          if (Array.isArray(entries) && entries.length <= 50 && entries.every(isAnnotation)) {
+            restored[item.id] = [...new Map(entries.map((note) => [note.id, note])).values()];
+          }
+        }
+      }
+      if (raw === null) {
+        const old: unknown = JSON.parse(localStorage.getItem("seenx-preview-notes-v1") ?? "{}");
+        if (old && typeof old === "object" && !Array.isArray(old)) for (const item of demoItems) {
+          const text = (old as Record<string, unknown>)[item.id];
+          if (typeof text === "string" && text.length <= 2000) restored[item.id] = text.trim() ? [{ id: `migrated-${item.id}`, text, anchor: { type: "image" } }] : [];
+        }
+      }
+      setStore(restored);
+      setCaptured(localStorage.getItem(captureKey) === "yes" || Boolean(restored[captureItem.id]));
+    } catch { /* A fresh sample still works when browser storage is unavailable. */ }
+    setReady(true);
+    const shortcut = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); returnToSearch(); }
     };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    window.addEventListener("keydown", shortcut);
+    return () => window.removeEventListener("keydown", shortcut);
   }, []);
 
-  useEffect(() => {
-    if (selected) dialogRef.current?.showModal();
-  }, [selected]);
+  useEffect(() => { if ((selected || capturePreview) && !dialogRef.current?.open) dialogRef.current?.showModal(); }, [selected, capturePreview]);
 
-  function openItem(item: DemoItem) { setSelected(item); }
+  function returnToSearch() {
+    dialogRef.current?.close(); setSelected(null); setCapturePreview(false); setQuery("");
+    requestAnimationFrame(() => { searchRef.current?.focus(); searchRef.current?.scrollIntoView({ block: "center", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" }); });
+  }
 
-  return (
-    <div className="demo-wrap" id="demo">
-      <div className="floating-note"><span className="note-arrow">↙</span> Go on, try remembering something.</div>
-      <div className="desktop-window">
-        <div className="window-bar"><div className="traffic-lights" aria-hidden="true"><i /><i /><i /></div><span>seenX</span><span aria-hidden="true" /></div>
-        <div className="desktop-body">
-          <aside className="demo-sidebar" aria-label="Demo library filters">
-            <div className="sidebar-heading">YOUR LIBRARY</div>
-            {([{ value: "all", label: "All images", icon: "image" }, { value: "screenshot", label: "Screenshots", icon: "monitor" }, { value: "photo", label: "Photographs", icon: "image" }] as const).map(({ value, label, icon }) => <button key={value} className={`sidebar-link ${kind === value ? "active" : ""}`} onClick={() => setKind(value)} aria-pressed={kind === value}><Icon name={icon} size={16} />{label}<span>{value === "all" ? demoItems.length : demoItems.filter((item) => item.kind === value).length}</span></button>)}
-            <div className="sidebar-heading folders-heading">SAMPLE FOLDERS</div><div className="sidebar-folder"><Icon name="folder" size={15} /> Screenshots</div><div className="sidebar-folder"><Icon name="folder" size={15} /> Little adventures</div>
-            <div className="sidebar-device"><span className="device-icon"><Icon name="monitor" size={18} /></span><div>On your Mac<span>That’s the idea.</span></div><Icon name="lock" size={14} /></div>
-          </aside>
-          <div className="demo-main">
-            <div className="search-field"><Icon name="search" size={21} /><input ref={searchRef} aria-label="Search the sample library" placeholder="Describe what you remember…" value={query} onChange={(event) => setQuery(event.target.value)} /><kbd>⌘ K</kbd>{query && <button aria-label="Clear search" className="icon-button" onClick={() => setQuery("")}><Icon name="close" size={16} /></button>}</div>
-            <div className="demo-toolbar"><div><span className="demo-title">{query ? "A few familiar things" : "Your little collection"}</span><span className="result-count" role="status" aria-live="polite">{results.length} {results.length === 1 ? "image" : "images"}</span></div><label className="collection-filter"><Icon name="pin" size={13} /><span className="sr-only">Filter sample collection</span><select value={collection} onChange={(event) => setCollection(event.target.value)}><option value="all">Everywhere</option><option>Alpine trip</option><option>Coastal trip</option><option>City trip</option><option>Work</option></select></label></div>
-            <div className="image-grid">{results.map((item) => <button className="image-card" key={item.id} onClick={() => openItem(item)} aria-label={`Preview ${item.title}`}><div className="image-art"><Artwork item={item} /><span className="image-type"><Icon name={item.kind === "photo" ? "image" : "monitor"} size={12} /></span><span className="image-expand"><Icon name="diagonal" size={15} /></span></div><div className="image-caption"><strong>{item.title}</strong><span>{item.file}</span></div></button>)}</div>
-            {!results.length && <div className="empty-state"><Icon name="search" size={30} /><strong>That memory isn’t in this sample.</strong><span>Try “mountains,” “terminal,” or “café,” or clear your filters.</span><button onClick={() => { setQuery(""); setCollection("all"); setKind("all"); }}>Show the whole collection <Icon name="arrow" size={15} /></button></div>}
-            <div className="demo-status"><span><span className="status-dot" /> Sample library · interactive preview</span><span>Try a memory below.</span></div>
-          </div>
-        </div>
-      </div>
-      <div className="try-queries"><span>Try a little nudge:</span>{["green mountains", "connection refused", "café menu"].map((value) => <button key={value} onClick={() => { setQuery(value === "café menu" ? "cafe menu" : value); setKind("all"); setCollection("all"); }}>{value}<Icon name="diagonal" size={12} /></button>)}</div>
-      <dialog ref={dialogRef} className="image-dialog" onClick={(event) => { if (event.target === event.currentTarget) dialogRef.current?.close(); }} onClose={() => setSelected(null)} aria-labelledby="preview-title">
-        {selected && <><button className="dialog-close icon-button" aria-label="Close image preview" onClick={() => dialogRef.current?.close()}><Icon name="close" /></button><div className="dialog-art"><Artwork item={selected} /></div><div className="dialog-info"><span className="eyebrow">SAMPLE RECORD</span><h2 id="preview-title">{selected.title}</h2><dl><div><dt>Filename</dt><dd>{selected.file}</dd></div><div><dt>Collection</dt><dd>{selected.location}</dd></div><div><dt>Type</dt><dd>{selected.kind}</dd></div></dl><p>Sample image and illustrative metadata.</p></div></>}
-      </dialog>
-    </div>
-  );
+  function captureScreenshot() {
+    setCaptured(true); setCapturePreview(false); setSelected(captureItem);
+    try { localStorage.setItem(captureKey, "yes"); } catch { /* Keep the sample capture for this visit. */ }
+  }
+
+  function saveAnnotations(next: MemoryAnnotation[]) {
+    if (!selected) return false;
+    const updated = { ...store, [selected.id]: next };
+    setStore(updated);
+    try { localStorage.setItem(storageKey, JSON.stringify(updated)); return true; }
+    catch { return false; }
+  }
+
+  return <div className="demo-wrap image-search-demo" id="demo">
+    <form className="memory-search-bar" role="search" onSubmit={(event) => { event.preventDefault(); if (results[0] && ready) setSelected(results[0]); }}><Icon name="search" size={22} /><input ref={searchRef} aria-label="Search the sample memories" placeholder="Search your memories…" value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "ArrowDown") { event.preventDefault(); document.querySelector<HTMLButtonElement>(".image-search-demo .image-card")?.focus(); } }} />{query ? <button type="button" aria-label="Clear search" className="icon-button" onClick={() => { setQuery(""); searchRef.current?.focus(); }}><Icon name="close" size={17} /></button> : <kbd>⌘ K</kbd>}</form>
+    <div className="try-queries"><span>Try:</span>{["softer palette", "matcha", "connection refused"].map((value) => <button key={value} onClick={() => setQuery(value)}>{value}</button>)}</div>
+    <div className="sample-capture-entry"><span><Icon name="monitor" size={15} /> Try the whole flow: capture → highlight → save → search.</span><button className="button button-dark button-small" onClick={() => setCapturePreview(true)} disabled={!ready}>{captured ? "Try the sample capture" : "Take a sample screenshot"}<Icon name="plus" size={14} /></button></div>
+    <div className="image-search-heading"><span>{query ? "Found in your memories" : "A few things worth keeping"}</span><span role="status" aria-live="polite">{results.length} {results.length === 1 ? "image" : "images"}</span></div>
+    <div className="memory-results image-grid">{results.map((item) => <button className="memory-result image-card" key={item.id} onClick={() => setSelected(item)} aria-label={`Open memory: ${item.title}`} disabled={!ready}><div className="memory-thumb image-art"><MemoryArtwork item={item} /><span className="memory-note-count"><Icon name="pin" size={11} />{notesFor(item).length} {notesFor(item).length === 1 ? "note" : "notes"}</span><span className="memory-open-hint"><Icon name="plus" size={14} /> Add context</span></div><div className="memory-result-copy"><strong>{item.title}</strong><small>{item.location}<Icon name="diagonal" size={12} /></small></div></button>)}</div>
+    {!results.length && <div className="empty-state"><Icon name="search" size={26} /><strong>No matching sample memories.</strong><span>Try “checkout,” “matcha,” or words from a note you saved.</span><button onClick={() => setQuery("")}>Show all memories <Icon name="arrow" size={15} /></button></div>}
+    <p className="image-search-footer"><Icon name="lock" size={12} /> Sample images. Click one, then pin a thought or highlight an area. Your edits stay in this browser.</p>
+    <dialog ref={dialogRef} className="image-dialog memory-dialog spatial-dialog" onClick={(event) => { if (event.target === event.currentTarget) dialogRef.current?.close(); }} onClose={() => { setSelected(null); setCapturePreview(false); }} aria-labelledby="preview-title">
+      {capturePreview ? <div className="sample-capture-preview"><div className="annotation-header"><div><span className="eyebrow">01 / TAKE A PRETEND SCREENSHOT</span><h2 id="preview-title">Something worth keeping.</h2></div><button className="dialog-close icon-button" aria-label="Close capture preview" onClick={() => dialogRef.current?.close()}><Icon name="close" /></button></div><div className="sample-browser"><div className="sample-browser-bar"><span className="traffic-lights" aria-hidden="true"><i /><i /><i /></span><span><Icon name="lock" size={11} /> example.com/shop</span></div><MemoryArtwork item={demoItems[0]} /></div><div className="sample-capture-actions"><p>A sample page, not your real screen. Next: highlight some text and add a thought.</p><button className="button button-dark" onClick={captureScreenshot}>Capture screenshot <Icon name="monitor" size={16} /></button></div></div> : selected && <MemoryAnnotator key={selected.id} item={selected} annotations={notesFor(selected)} onChange={saveAnnotations} onClose={() => dialogRef.current?.close()} onSearch={returnToSearch} />}
+    </dialog>
+  </div>;
 }

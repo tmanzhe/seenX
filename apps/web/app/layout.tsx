@@ -2,11 +2,15 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { SiteFrame } from "../components/site-frame";
 import { SoundProvider } from "../components/sound-controls";
+import { productDescription } from "../lib/product";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: { default: "seenX — Find what you remember", template: "%s — seenX" },
-  description: "A local-first visual memory for your Mac. Explore the early seenX concept: search screenshots and images by words, meaning, and metadata.",
+  metadataBase: new URL("https://seenx-lovat.vercel.app"),
+  title: { default: "seenX — Save what matters. Remember why.", template: "%s — seenX" },
+  description: productDescription,
+  openGraph: { title: "seenX — Save what matters. Remember why.", description: productDescription, siteName: "seenX", type: "website", locale: "en_US" },
+  twitter: { card: "summary", title: "seenX — Save what matters. Remember why.", description: productDescription },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

@@ -6,32 +6,39 @@ import { UseCases } from "../components/use-cases";
 import { LandingMotion } from "../components/landing-motion";
 
 export default function Home() {
-  return (
-    <main id="main" className="landing-page">
-      <LandingMotion />
-      <section className="hero hero-editorial">
-        <AsciiMemory />
-        <div className="hero-copy">
-        <h1>Everything you saved.<br />Back in <em>context.</em></h1>
-        <p className="hero-description">Find screenshots and visual references by what you remember. Give your agents a way to find them, too.</p>
-        <div className="hero-actions"><a href="#demo" className="button button-orange">Explore the preview <Icon name="arrow" size={17} /></a><Link href="/docs" className="text-link">See what we’re building <Icon name="diagonal" size={15} /></Link></div>
-        </div>
-      </section>
-      <div className="demo-section"><SearchDemo /></div>
+  return <main id="main" className="landing-page">
+    <LandingMotion />
+    <section className="hero hero-editorial">
+      <AsciiMemory />
+      <div className="hero-copy">
+        <h1>Save what matters.<br />Remember <em>why.</em></h1>
+        <p className="hero-description">A local visual memory for the things you save and the thoughts you attach to them. Find it by what you remember. Keep the context that makes it yours.</p>
+        <div className="hero-actions"><a href="#demo" className="button button-orange">Try a little remembering <Icon name="arrow" size={17} /></a><Link href="/docs" className="text-link">Meet seenX <Icon name="diagonal" size={15} /></Link></div>
+      </div>
+      <div className="capture-hud" aria-label="Concept of a quick note after saving a screenshot"><div className="capture-hud-icon"><Icon name="image" size={20} /></div><div><strong>A screenshot. A little context.</strong><span>“Love this flow. Try a softer palette.”</span><small>Your thought, kept with the image.</small></div><span className="capture-hud-check"><Icon name="check" size={14} /></span></div>
+    </section>
 
-      <UseCases />
+    <section className="demo-section" aria-labelledby="demo-heading"><div className="demo-intro"><div><span className="eyebrow">A SMALL PREVIEW OF A BIG LITTLE MEMORY</span><h2 id="demo-heading">The thing you saved.<br /><em>The reason you saved it.</em></h2></div><p>Take a sample screenshot. Highlight a detail.<br />Save a thought, then find it again with ⌘ K.</p></div><SearchDemo /></section>
 
-      <section className="local-section section-container" id="local-first">
-        <div className="local-copy"><span className="eyebrow">A SMALL APP. A PERSONAL SPACE.</span><h2>Your memories.<br /><em>Your machine.</em></h2><p>The goal is simple: your selected folders, a local index, and search that works without sending your images to an AI service.</p><ul><li><Icon name="check" size={16} /> You choose the folders.</li><li><Icon name="check" size={16} /> Models run on your device.</li><li><Icon name="check" size={16} /> Your index stays under your control.</li></ul><Link href="/docs/privacy" className="text-link">Read the privacy approach <Icon name="arrow" size={15} /></Link></div>
-        <div className="local-visual" aria-label="Concept diagram showing selected folders connecting to a local index"><span className="diagram-caption">THE INTENDED FLOW</span><div className="folder-stack"><div><Icon name="folder" /><span>Screenshots</span></div><div><Icon name="folder" /><span>Little adventures</span></div><div><Icon name="folder" /><span>Things worth keeping</span></div></div><div className="connection-line" /><div className="index-node"><span className="brand-symbol" aria-hidden="true"><i /><i /><i /><i /></span><div>seenX index<span>Words + meaning + metadata</span></div><Icon name="lock" size={18} /></div><div className="device-boundary"><Icon name="monitor" size={15} /> This boundary is your Mac.</div></div>
-      </section>
+    <section className="memory-steps section-container" id="how-it-works" aria-labelledby="steps-heading"><div className="section-intro"><span className="eyebrow">LESS ORGANIZING. MORE REMEMBERING.</span><h2 id="steps-heading">A small habit. A useful memory.</h2><p>The first-release direction: a shortcut, a quick note, and a way back.</p></div><div className="memory-steps-grid">
+      <article><span className="step-number">01 / KEEP IT</span><span className="step-icon"><Icon name="image" size={23} /></span><h3>Save it naturally.</h3><p>A screenshot, a saved image, something worth keeping. Choose the locations seenX can watch. Your originals stay put.</p><div className="step-mini"><Icon name="image" size={14} /><span>Screenshot saved</span><Icon name="check" size={14} /></div></article>
+      <article><span className="step-number">02 / MAKE IT YOURS</span><span className="step-icon"><Icon name="code" size={23} /></span><h3>Add a thought. Or don’t.</h3><p>A tiny capture HUD lets you note why it mattered. No mandatory tags, naming, or cleanup. Add more context whenever you want.</p><div className="step-mini step-mini-note">“This is the part I liked.”<span>↵</span></div></article>
+      <article><span className="step-number">03 / COME BACK TO IT</span><span className="step-icon"><Icon name="search" size={23} /></span><h3>Find it in your words.</h3><p>A global command bar searches the image, its visible text, and your notes. Copy the context or bring it into your next task.</p><div className="step-mini"><Icon name="search" size={14} /><span>The checkout I liked…</span><kbd>⌘ K</kbd></div></article>
+    </div></section>
 
-      <section className="faq-section section-container"><div><span className="eyebrow">A FEW GOOD QUESTIONS</span><h2>Before you ask.</h2></div><div className="faq-list">{[
-        ["Does the preview search my own files?", "No. It searches authored sample records in your browser. It does not access your folders or run an AI model."],
-        ["Will it record my screen?", "The current direction is to index images in folders you select. Continuous screen recording is outside the initial scope."],
-        ["Will a connected agent keep images local?", "seenX indexing is intended to run locally. A connected agent may forward retrieved images to its model provider, depending on its configuration."],
-        ["When can I try it?", "seenX is in development. Explore the preview and follow the build in the docs."],
-      ].map(([question, answer]) => <details key={question}><summary>{question}<span aria-hidden="true">+</span></summary><p>{answer}</p></details>)}</div></section>
-    </main>
-  );
+    <UseCases />
+
+    <section className="assistant-section section-container" id="assistant-bridge" aria-labelledby="assistant-heading"><div className="assistant-copy"><span className="eyebrow">YOUR MEMORY, WITH YOU</span><h2 id="assistant-heading">Your assistant should<br />get <em>your context.</em></h2><p>The references you saved. The details you noticed. The things you didn’t like. Let a compatible assistant find them together, without digging through folders and explaining it all again.</p><ul><li><Icon name="check" size={15} /> MCP is part of the first-release plan.</li><li><Icon name="check" size={15} /> You choose the collections it can search.</li><li><Icon name="check" size={15} /> Images, notes, and sources stay connected.</li></ul><Link href="/docs/agents" className="text-link">How the connection is planned <Icon name="arrow" size={15} /></Link></div><div className="assistant-concept"><div className="assistant-concept-top"><span className="brand-symbol" aria-hidden="true"><i /><i /><i /><i /></span><span>seenX × your assistant</span><span className="concept-badge">Planned</span></div><div className="assistant-prompt">Pull my screenshots tagged “checkout flow” and build a prototype matching my notes.</div><div className="assistant-tool"><Icon name="search" size={14} /><span>Search selected memories</span><Icon name="lock" size={13} /></div><div className="assistant-memory"><div className="assistant-memory-art"><Icon name="image" size={26} /></div><div><strong>A checkout worth remembering</strong><span>“Keep the spacing. Try a softer palette.”</span><small>Image + your note + source</small></div></div><p className="assistant-boundary">Local search. Deliberate sharing. Content sent to a cloud assistant is processed by its provider.</p></div></section>
+
+    <section className="local-section section-container" id="local-first"><div className="local-copy"><span className="eyebrow">A PERSONAL SPACE, ON YOUR MAC</span><h2>Your memories.<br /><em>Your say.</em></h2><p>Start with screenshots and images in locations you choose. The intended app keeps indexing and search on your device. Assistant access is optional, and sharing is a separate choice.</p><ul><li><Icon name="check" size={16} /> Your original files stay where they are.</li><li><Icon name="check" size={16} /> Your notes stay editable and exportable.</li><li><Icon name="check" size={16} /> App and URL context, where capture permissions allow.</li></ul><Link href="/docs/privacy" className="text-link">The privacy approach <Icon name="arrow" size={15} /></Link></div><div className="local-visual" aria-label="Images, visible text, and personal notes connect to the same local memory"><span className="diagram-caption">ONE MEMORY. MORE THAN AN IMAGE.</span><div className="folder-stack"><div><Icon name="image" /><span>What you saved</span></div><div><Icon name="search" /><span>The words inside it</span></div><div><Icon name="heart" /><span>Your side of the story</span></div></div><div className="connection-line" /><div className="index-node"><span className="brand-symbol" aria-hidden="true"><i /><i /><i /><i /></span><div>Your seenX memory<span>Linked originals, text, notes, and sources</span></div><Icon name="lock" size={18} /></div><div className="device-boundary"><Icon name="monitor" size={15} /> Kept together. Kept local.</div></div></section>
+
+    <section className="faq-section section-container"><div><span className="eyebrow">A FEW THINGS TO KNOW</span><h2>A little clarity.</h2></div><div className="faq-list">{[
+      ["Can I use it without an AI assistant?", "Yes—that is the product direction. The command bar should be useful on its own. Connecting a compatible assistant is optional."],
+      ["Do I have to add a note to everything?", "No. Notes add your intention, but images should remain searchable by appearance, visible text, and available source details. Add a thought when it helps."],
+      ["Does this preview access my Mac?", "No. It searches authored sample memories in your browser. Edited sample notes stay in this browser’s local storage. No real screenshots, app activity, or folders are accessed."],
+      ["Will connected assistants keep everything local?", "The library and search are intended to stay local. If you authorize a cloud assistant to retrieve an image or note, that content leaves your device and is processed by the assistant’s provider."],
+      ["What is available today?", "This interactive website preview and the project’s retrieval experiments. The desktop command bar, capture HUD, automatic source capture, and MCP connection are in development. There is no desktop download yet."],
+    ].map(([question, answer]) => <details key={question}><summary>{question}<span aria-hidden="true">+</span></summary><p>{answer}</p></details>)}</div></section>
+    <section className="memory-closing section-container"><span className="eyebrow">A LITTLE LESS LOST</span><h2>Keep the image.<br /><em>Keep the meaning.</em></h2><a href="#demo" className="button button-orange">Explore the preview <Icon name="arrow" size={16} /></a><Link href="/docs/roadmap" className="text-link">Follow the build <Icon name="diagonal" size={14} /></Link></section>
+  </main>;
 }

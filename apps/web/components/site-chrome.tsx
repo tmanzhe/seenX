@@ -13,7 +13,7 @@ export function Header() {
       <div className="nav-inner">
         <Brand />
         <nav aria-label="Main navigation">
-          <Link href="/#use-cases" className="nav-product">Use cases</Link>
+          <Link href="/#how-it-works" className="nav-product">How it works</Link>
           <Link href="/docs">Docs</Link>
           <Link href="/support" className="nav-support">Support <Icon name="heart" size={14} /></Link>
         </nav>
@@ -26,7 +26,7 @@ export function Header() {
 export function Footer() {
   return (
     <footer className="site-footer">
-      <div className="footer-top"><div><Brand /><p>Find what you remember.</p></div><div className="footer-links"><Link href="/docs">Documentation</Link><Link href="/support">Support the project</Link></div></div>
+      <div className="footer-top"><div><Brand /><p>Keep the image. Keep the meaning.</p></div><div className="footer-links"><Link href="/docs/roadmap">Roadmap</Link><Link href="/docs/architecture">The stack</Link><Link href="/docs">Documentation</Link><Link href="/support">Support the project</Link></div></div>
       <div className="footer-bottom"><span>© {new Date().getUTCFullYear()} seenX</span><span><span className="status-dot" /> In development · macOS first</span></div>
     </footer>
   );
