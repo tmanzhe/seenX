@@ -13,7 +13,7 @@ dependencies = ["Pillow>=12.0,<13", "pypdf>=6,<7"]
 ocr = ["pyobjc-framework-Vision>=11,<13; sys_platform == 'darwin'"]
 
 [tool.setuptools]
-py-modules = ["load_images", "image_ocr"]
+py-modules = ["load_images", "image_ocr", "record_cache"]
 
 [tool.uv]
 package = false

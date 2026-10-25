@@ -2,7 +2,7 @@
 
 A local-first image search application for macOS, designed to find screenshots and saved images using visible text and natural-language descriptions.
 
-**Status:** a Next.js product/docs site, dependency-free Rust library scaffold, and Python prototype for PDF text search and optional macOS image OCR search are available. Desktop indexing, desktop search, and the native macOS app are not implemented yet. Start with the [Python walkthrough](experiments/README.md) to follow the current build step by step.
+**Status:** a Next.js product/docs site, dependency-free Rust library scaffold, and Python prototype for PDF/image text search with optional macOS OCR and a local SQLite extraction cache are available. Desktop indexing, desktop search, and the native macOS app are not implemented yet. Start with the [Python walkthrough](experiments/README.md) to follow the current build step by step.
 
 Planned capabilities:
 

@@ -2,7 +2,7 @@
 
 We're building a local file-search prototype, one useful piece at a time. The idea is to find a screenshot, photo, or document using something you remember about it. Python lets us try the pieces and understand the results before deciding what belongs in the Rust desktop engine.
 
-Right now we can open images and PDFs, recognize image text with optional local OCR on macOS, and search both kinds of text. We haven't added embeddings, a database, or a Python web server. OCR uses Apple's pretrained text-recognition system; we aren't training a model. The Next.js website is a separate project under `apps/web`; this script isn't connected to it.
+Right now we can open images and PDFs, recognize image text with optional local OCR on macOS, and search both kinds of text. An optional SQLite cache lets us reuse extracted records between runs. We haven't added embeddings or a Python web server. OCR uses Apple's pretrained text-recognition system; we aren't training a model. The Next.js website is a separate project under `apps/web`; this script isn't connected to it.
 
 ## Get it running
 
@@ -57,13 +57,15 @@ experiments/.venv/bin/python experiments/load_images.py practice-images
 | --- | --- |
 | `load_images.py` | The Python script. Despite the name, it now supports PDFs too. |
 | `image_ocr.py` | The small adapter between Python and Apple's Vision OCR framework. |
-| `test_search.py`, `test_ocr.py` | Repeatable checks for matching and OCR behavior. |
+| `record_cache.py` | Stores and retrieves extracted records with Python's built-in SQLite support. |
+| `test_search.py`, `test_ocr.py`, `test_cache.py` | Repeatable checks for matching, OCR, and cache behavior. |
 | `pyproject.toml` | The Python version requirement and dependencies. |
 | `.venv/` | The interpreter and installed packages. Generated locally and ignored by Git. |
 | `../practice-images/` | Your original files. Ignored by Git. |
 | `data/`, `outputs/` | Empty leftovers from an early smoke check. The script doesn't use them. |
+| `.cache/records.sqlite3` | Optional local database created by `--cache`. Contains extracted text and paths; ignored by Git. |
 
-The script doesn't save converted images, thumbnails, or a manifest. Your originals are opened for reading. Extracted text stays in memory for this run and isn't saved or printed. Personal files, model downloads, and future experiment outputs should stay out of Git.
+The script doesn't save converted images, thumbnails, or a manifest. Your originals are opened for reading. Without `--cache`, extracted text stays in memory for this run. With `--cache`, text and file paths are saved in the local database. Extracted contents aren't printed. Personal files, cache databases, model downloads, and future experiment outputs should stay out of Git.
 
 ## How we built this, and why
 
@@ -136,7 +138,7 @@ terminal arguments → folder → choose reader → return dictionary
                                            → append to list → print summary
 ```
 
-The list only lives during the run. There is no persistent index yet, and PDF text consumes memory while retained. This is a small-folder experiment.
+The list lives during the run, and PDF text consumes memory while retained. Step 6 adds optional persistence for the records, but search still scans the in-memory list. This is a small-folder experiment.
 
 ### 4. Search the PDF text
 
@@ -171,7 +173,7 @@ Read that from the inside out:
 
 That lets `TRAIN BOOKING` match `Train` followed by a line break and `booking`. We don't remove punctuation, fix OCR mistakes, match synonyms, rank results, or join phrases across page boundaries. PDF extraction can also produce unexpected reading order. These are useful limits to understand before adding more sophisticated search.
 
-Every run reads the files again. `--limit` still applies to the combined image/PDF collection before searching, so use a larger limit if a desired PDF is later in filename order. Without `--ocr`, the command reminds you that only PDF text is searched.
+Without caching, every run reads the files again. `--limit` still applies to the combined image/PDF collection before searching, so use a larger limit if a desired PDF is later in filename order. Without `--ocr`, the command reminds you that only PDF text is searched.
 
 We test the matching behavior with invented text dictionaries, not copies of personal documents or generated images:
 
@@ -218,6 +220,58 @@ For reference: [Apple's text-recognition request](https://developer.apple.com/do
 
 The tests include mixed image/PDF search and clear errors for unsupported platforms and missing dependencies. An optional local-image check mocks recognition to distinguish disabled OCR, no text, and a recognition error. It skips if there isn't a local practice JPEG. No personal files are committed.
 
+### 6. Stop rereading unchanged files
+
+Once OCR worked, a practical problem showed up: each new query ran recognition again. We added an optional **cache**, a saved copy of extraction results that we can reuse when the source hasn't changed.
+
+From `experiments`, with the environment activated:
+
+```sh
+python load_images.py ../practice-images --ocr --cache --query "your phrase"
+python load_images.py ../practice-images --ocr --cache --query "another phrase"
+```
+
+On the first run the database starts empty. On the next run, a line such as `Cache: reused 9 of 9 loaded file(s).` tells you extraction was skipped for those files. Without `--cache`, the command behaves as it did before and doesn't read or write the database.
+
+We chose **SQLite** because Python includes it as the `sqlite3` module. It's a database stored in one local file, with no database server to install or run. A table is a collection of rows with named columns. Each row stores a file path, a reader identifier, the file's modification timestamp and size, and the extracted record.
+
+The reader identifier includes our record-format version and relevant library versions. Image OCR also includes the macOS version and recognition settings. This keeps results from different extraction modes separate. Running without `--ocr` won't accidentally search text left over from an earlier OCR run. If we change our extraction code or settings, we need to update the reader identifier too.
+
+Before reading a file, `read_folder()` asks the cache for a matching row:
+
+```python
+record = get_record(cache, path, key, state)
+```
+
+A returned dictionary is a **cache hit**. `None` is a **cache miss**, so we read the source normally. `path.stat()` provides the source's modification time and byte size. If either changes, the old row doesn't match and extraction runs again. This is a quick freshness check, not a content hash: deliberately preserving both size and timestamp can hide a change.
+
+Inside the cache, this SQL query finds a matching record:
+
+```sql
+SELECT record FROM records
+WHERE path = ? AND reader = ? AND mtime_ns = ? AND size = ?
+```
+
+SQL is the language used to ask the database for data. The `?` placeholders are filled with separately supplied values. We don't paste filenames into SQL strings. `fetchone()` gets one matching row, or returns `None`.
+
+SQLite stores the dictionary as **JSON**, a text format for lists, dictionaries, numbers, and strings. `json.dumps(record)` serializes the Python dictionary into text. `json.loads(...)` deserializes it back into Python values. We store strings rather than `Path` objects so every record can be serialized directly.
+
+`INSERT OR REPLACE` saves the new record for a file and reader. `commit()` makes the write persistent. `open_cache()` is a context manager built with `@contextmanager`: it opens the connection, `yield`s it to the `with` block, then closes it in `finally`, even if the run fails. With caching disabled it yields `None`, and the cache helpers do nothing.
+
+To deliberately rerun extraction for the files in this scan:
+
+```sh
+python load_images.py ../practice-images --ocr --cache --refresh
+```
+
+`--refresh` requires `--cache`. It bypasses saved records and replaces successful results. Known OCR failures aren't saved, so failed recognition is retried rather than becoming a permanent empty result. A file whose size or timestamp changes during extraction is skipped and can be retried next time.
+
+We still scan the selected folder on every run. A deleted file therefore won't appear in results, even if an old row remains in the database. Old rows aren't automatically purged: the database retains extracted text until you remove it. To discard all cached text, stop the script and delete `.cache/records.sqlite3` inside `experiments`; the next cached run creates it again. The database is ordinary unencrypted local storage and stays ignored by Git.
+
+This is an extraction cache, not a database search engine. Search still uses the same Python substring matching over the loaded records, and the file limit still applies. Caching avoids repeated OCR and PDF extraction; it doesn't add ranking, folder watching, or full-text indexing. OCR dependencies are still required whenever `--ocr` is requested, even with a warm cache.
+
+The cache tests use temporary placeholder files and invented records. They check persistence after reopening, changed file size and timestamps, reader changes, forced refresh, OCR failures, files removed from the folder, and files changing during extraction. They don't create image fixtures or commit personal data.
+
 ## Reading the rest of the script
 
 `main()` coordinates the work. Here's what its building blocks mean:
@@ -252,6 +306,13 @@ Start with **variables**, **strings and integers**, **functions and arguments**,
 
 For this latest step, search for:
 
+- `Python sqlite3 tutorial`: opening a local database, executing SQL, and committing writes.
+- `Python json dumps loads`: saving dictionaries as text and restoring them.
+- `Python pathlib stat st_mtime_ns st_size`: checking whether a source file changed.
+- `Python contextlib contextmanager yield finally`: opening and closing resources reliably.
+
+The OCR step introduced:
+
 - `Python boolean flags argparse store_true`: how `--ocr` turns recognition on.
 - `Python default parameter values`: why `ocr=False` makes recognition optional.
 - `Python modules imports`: why we moved the adapter into its own file.
@@ -278,7 +339,7 @@ Other concepts already used are `Python pathlib`, `Python argparse beginner`, `P
 
 ## What comes next
 
-We now have PDF and image text search. Next we'll measure which queries it handles and where it fails before adding image embeddings for visual descriptions that don't depend on visible words. OCR for scanned PDFs is another separate step. Each feature gets its own verification and Git commit, separate from frontend changes.
+We now have PDF and image text search with optional reuse of extracted records. Next we'll measure which queries it handles and where it fails before adding image embeddings for visual descriptions that don't depend on visible words. OCR for scanned PDFs is another separate step. Each feature gets its own verification and Git commit, separate from frontend changes.
 
 Later, we'll compare keyword and semantic retrieval on labeled queries, and test whether relationships such as receipts belonging to trips improve results. Models may propose relationships; evidence and user confirmation need to stay distinguishable. We will measure useful behavior before moving it into the Rust engine. Python is our development reference, not a required runtime for the intended desktop release.
 
