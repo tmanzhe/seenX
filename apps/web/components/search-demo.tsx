@@ -60,10 +60,8 @@ export function SearchDemo() {
     const shortcut = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); returnToSearch(); }
     };
-    const launchCapture = () => setCapturePreview(true);
     window.addEventListener("keydown", shortcut);
-    window.addEventListener("seenx:try-capture", launchCapture);
-    return () => { window.removeEventListener("keydown", shortcut); window.removeEventListener("seenx:try-capture", launchCapture); };
+    return () => window.removeEventListener("keydown", shortcut);
   }, []);
 
   useEffect(() => { if ((selected || capturePreview) && !dialogRef.current?.open) dialogRef.current?.showModal(); }, [selected, capturePreview]);
@@ -99,8 +97,7 @@ export function SearchDemo() {
   return <div className="demo-wrap image-search-demo" id="demo">
     <form className="memory-search-bar" role="search" onSubmit={(event) => { event.preventDefault(); if (results[0] && ready) setSelected(results[0]); }}><Icon name="search" size={22} /><input ref={searchRef} aria-label="Search the sample memories" placeholder="Search your memories…" value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "ArrowDown") { event.preventDefault(); document.querySelector<HTMLButtonElement>(".image-search-demo .image-card")?.focus(); } }} />{query ? <button type="button" aria-label="Clear search" className="icon-button" onClick={() => { setQuery(""); searchRef.current?.focus(); }}><Icon name="close" size={17} /></button> : <kbd>⌘ K</kbd>}</form>
     <div className="try-queries"><span>Try:</span>{["softer palette", "matcha", "connection refused"].map((value) => <button key={value} onClick={() => setQuery(value)}>{value}</button>)}</div>
-    <div className="sample-capture-entry"><ol className="demo-flow-steps" aria-label="Try the workflow"><li><span>1</span> Capture</li><li><span>2</span> Highlight</li><li><span>3</span> Save</li><li><span>4</span> Recall</li></ol><button className="button button-dark button-small" onClick={() => setCapturePreview(true)} disabled={!ready}>{captured ? "Try the sample capture" : "Take a sample screenshot"}<Icon name="plus" size={14} /></button></div>
-    <div className="image-search-heading"><span>{query ? "Found in your memories" : "A few things worth keeping"}</span><span role="status" aria-live="polite">{results.length} {results.length === 1 ? "image" : "images"}</span></div>
+    <div className="image-search-heading"><span role="status" aria-live="polite">{results.length} {results.length === 1 ? "image" : "images"}</span><button className="button button-dark button-small" onClick={() => setCapturePreview(true)} disabled={!ready}>{captured ? "Try the sample capture" : "Take a sample screenshot"}<Icon name="plus" size={14} /></button></div>
     <div className="memory-results image-grid">{results.map((item) => <button className="memory-result image-card" key={item.id} onClick={() => setSelected(item)} aria-label={`Open memory: ${item.title}`} disabled={!ready}><div className="memory-thumb image-art"><MemoryArtwork item={item} /><span className="memory-note-count" key={notesFor(item).length}><Icon name="pin" size={11} />{notesFor(item).length} {notesFor(item).length === 1 ? "note" : "notes"}</span><span className="memory-open-hint"><Icon name="plus" size={14} /> Add context</span></div><div className="memory-result-copy"><strong>{item.title}</strong><small>{item.location}<Icon name="diagonal" size={12} /></small></div></button>)}</div>
     {!results.length && <div className="empty-state"><Icon name="search" size={26} /><strong>No matching sample memories.</strong><span>Try “checkout,” “matcha,” or words from a note you saved.</span><button onClick={() => setQuery("")}>Show all memories <Icon name="arrow" size={15} /></button></div>}
     <p className="image-search-footer"><Icon name="lock" size={12} /> Demo images. Real interactions. Your edits stay in this browser.</p>

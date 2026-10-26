@@ -35,18 +35,9 @@ export function LandingMotion() {
           observer.unobserve(entry.target);
         });
       }, { threshold: 0.08, rootMargin: "0px 0px -24px 0px" });
-      const observe = () => root.querySelectorAll(".hero-copy > *, .premium-scene-wrap, .demo-intro > *, .desktop-window, .section-intro > *, .memory-steps-grid article, .use-case-grid article, .assistant-copy > *, .assistant-concept, .local-copy > *, .portability-copy > *, .portability-visual, .folder-stack > div, .index-node, .device-boundary, .faq-section > div:first-child, .faq-list details, .memory-closing > *").forEach((element) => {
-        if (!seen.has(element)) observer.observe(element);
-      });
-      observe();
-      // New search results and tab content receive the same entrance treatment.
-      const mutations = new MutationObserver(observe);
-      root.querySelectorAll(".image-grid, #audience-panel").forEach((element) => {
-        mutations.observe(element, { childList: true, subtree: true });
-      });
+      root.querySelectorAll(".hero-copy > *, .premium-scene-wrap, .demo-intro > *, .assistant-copy > *, .assistant-concept, .portability-copy > *, .portability-visual, .faq-section > div:first-child, .faq-list details").forEach((element) => observer.observe(element));
 
       const hero = root.querySelector<HTMLElement>(".hero-editorial");
-      const diagram = root.querySelector<HTMLElement>(".local-visual");
       const scene = root.querySelector<HTMLElement>(".premium-scene-wrap");
       let pointerFrame = 0;
       let pointer = { x: 0, y: 0 };
@@ -73,11 +64,7 @@ export function LandingMotion() {
           const distance = Math.max(0, -hero.getBoundingClientRect().top);
           hero.style.setProperty("--hero-drift", `${Math.min(distance * 0.025, 12)}px`);
         }
-        if (diagram) {
-          const bounds = diagram.getBoundingClientRect();
-          const progress = Math.min(1, Math.max(0, (innerHeight * 0.85 - bounds.top) / (innerHeight * 0.65)));
-          diagram.style.setProperty("--flow-progress", String(progress));
-        }
+
       };
       const requestUpdate = () => { if (!frame) frame = requestAnimationFrame(update); };
       const resize = new ResizeObserver(requestUpdate);
@@ -88,7 +75,6 @@ export function LandingMotion() {
       update();
       dispose = () => {
         observer.disconnect();
-        mutations.disconnect();
         resize.disconnect();
         animations.forEach((animation) => animation.cancel());
         cancelAnimationFrame(frame);
@@ -102,7 +88,6 @@ export function LandingMotion() {
         delete root.dataset.motion;
         root.style.removeProperty("--page-progress");
         hero?.style.removeProperty("--hero-drift");
-        diagram?.style.removeProperty("--flow-progress");
       };
     }
     setup();

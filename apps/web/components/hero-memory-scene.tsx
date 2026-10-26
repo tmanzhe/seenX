@@ -47,7 +47,6 @@ export function HeroMemoryScene() {
           <div className={styles.highlight} aria-hidden="true"><span>1</span><i /><i /><i /><i /></div>
           <div className={styles.cursor} aria-hidden="true"><svg viewBox="0 0 24 28"><path d="m3 2 17 15-9 1-5 7Z" /></svg><span>You</span></div>
         </div>
-        <div className={styles.savedLabel}><Icon name="check" size={12} /> Screenshot kept. Context included.</div>
       </div>
 
       <div className={styles.capturePill} aria-hidden={step !== 0}>
@@ -72,15 +71,13 @@ export function HeroMemoryScene() {
         </div>
       </div>
 
-      <div className={styles.localBadge}><Icon name="lock" size={12} /><span>Your images. Your context.</span></div>
     </div>
 
     <div className={styles.controls}>
       <div className={styles.tabs} role="tablist" aria-label="Explore the SeenX workflow">
         {steps.map((item, index) => <button key={item.name} ref={(node) => { tabRefs.current[index] = node; }} id={`${id}-tab-${index}`} type="button" role="tab" aria-selected={step === index} aria-controls={`${id}-panel`} tabIndex={step === index ? 0 : -1} onClick={() => setStep(index)} onKeyDown={(event) => navigateTabs(event, index)}><Icon name={item.icon} size={15} /><span>{item.name}</span></button>)}
       </div>
-      <p className={styles.description} aria-live="polite">{steps[step].description}</p>
-      <a className={styles.tryLink} href="#demo" onClick={() => window.dispatchEvent(new CustomEvent("seenx:try-capture"))}>Try it yourself <Icon name="arrow" size={14} /></a>
+      <p className="sr-only" aria-live="polite">{steps[step].description}</p>
     </div>
   </div>;
 }
