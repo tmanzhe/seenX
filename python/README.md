@@ -1,6 +1,6 @@
 # seenX in Python
 
-This is the working Python retrieval prototype. The frontend lives separately in `apps/web`, and the future native engine lives in `crates/seenx-core`. We use Python to learn the pipeline and measure behavior before moving proven pieces into Rust.
+This is the working Python retrieval prototype. The website lives separately in `apps/web`, and the native Swift app lives in `apps/macos`. We use Python to learn the pipeline and measure behavior before integrating proven pieces into the native app.
 
 The [detailed walkthrough](docs/walkthrough.md) follows how we built each piece and explains the Python concepts along the way.
 
@@ -19,7 +19,7 @@ uv run --project python seenx-search practice-images --mode hybrid --ocr --cache
 
 `uv` is already installed on the development Mac. On a new Mac, install it with `brew install uv`, or follow the [official installation instructions](https://docs.astral.sh/uv/getting-started/installation/).
 
-You don't need to create or activate an environment manually. `uv sync` reads `pyproject.toml` and `uv.lock`, creates `python/.venv`, and installs the selected dependencies. `.python-version` pins our development interpreter to Python 3.13.7. `uv run` executes a command in that environment. The virtual environment still exists; uv manages it for us.
+You don't need to create or activate an environment manually. `uv sync` reads `pyproject.toml` and `uv.lock`, creates `python/.venv`, and installs the selected dependencies. `.python-version` pins our development interpreter to Python 3.13.7. `uv run` executes a command in that environment. Keep this as the project's only Python environment; use `--project python` from the repository root instead of creating a second root `.venv`.
 
 The first sync downloads Python packages. Visual search also needs the pinned model, a separate download of roughly 600 MB. If it isn't already present, allow the first model download explicitly:
 
@@ -159,4 +159,4 @@ python/
 
 Start with variables, functions and return values, lists, dictionaries, conditions, and loops. Then learn exceptions and `with` statements. For recent work, look up `Python logging handlers formatters`, `Python contextvars`, `Python decorators`, `JSON Lines`, `SQLite`, and `uv projects lockfile`.
 
-The [walkthrough](docs/walkthrough.md) explains the retrieval code step by step. The [catalog lesson](docs/catalog.md) explains stable IDs, foreign keys, transactions, hashes, and normalized coordinates. The [OCR lesson](docs/ocr-observations.md) adds immutable observations, quote links, and schema migrations. Next, connect catalog notes and observations to retrieval using FTS5, while measuring relevance with labeled examples. No Python API server exists yet; the public website runs separately. Rust migration follows proven behavior behind shared contracts.
+The [walkthrough](docs/walkthrough.md) explains the retrieval code step by step. The [catalog lesson](docs/catalog.md) explains stable IDs, foreign keys, transactions, hashes, and normalized coordinates. The [OCR lesson](docs/ocr-observations.md) adds immutable observations, quote links, and schema migrations. Next, connect catalog notes and observations to retrieval using FTS5, while measuring relevance with labeled examples. No Python API server exists yet; the public website runs separately. Native integration follows proven behavior behind shared contracts.

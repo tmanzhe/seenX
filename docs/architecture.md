@@ -13,7 +13,6 @@ The hosted website is a separate static preview. It never becomes the user's loc
 | Website | Next.js/React/TypeScript, sample capture, authored text boxes, spatial annotations, localStorage, JSON export | Maintain truthful product/docs copy and demo behavior |
 | Python prototype | Image/PDF reading, Vision OCR strings/boxes, literal search, CLIP vectors, rank fusion, SQLite cache, diagnostics, versioned memory catalog and OCR quote links | Word/range selection, richer catalog relationships/collections, FTS5, semantic note retrieval, local engine contract, portable export |
 | Native Mac app | Initial SwiftUI/AppKit menu-bar app: translucent search, global shortcuts, system region capture, Vision text highlights, notes, separate local development library | Shared-engine integration, ScreenCaptureKit adapter, source permissions, production distribution |
-| Rust core | Dependency-free scaffold | Gradual migration of proven storage, indexing, retrieval, and access logic |
 | Assistant bridge | Website illustration and export only | Opt-in, bounded read-only MCP retrieval; client integration/evaluation |
 
 ## Target stack and why
@@ -24,7 +23,7 @@ The hosted website is a separate static preview. It never becomes the user's loc
 - **Vector search can remain embedded:** evaluate sqlite-vec against exact scanning. SQLite and vector retrieval are complementary, not alternative product directions. No vector extension is installed in the production core today.
 - **Python is the development reference:** existing code proves behavior before a port. A bounded local service can connect prototype clients; FastAPI is a candidate, not an existing server.
 - **SwiftUI/AppKit own native interaction:** capture, hotkeys, floating panels, platform permissions, OCR adapters, and annotations.
-- **The production engine language remains open:** the native frontend does not depend on Rust. Evaluate small measured migrations behind stable contracts rather than requiring a rewrite; Swift/Rust bindings are only a candidate if Rust is selected.
+- **Native engine integration follows measured behavior:** connect the Swift app to proven catalog and retrieval operations behind stable contracts, using the Python implementation as the evaluation reference.
 - **MCP is the assistant interface:** first-release scope, not a second independent search system or an autonomous agent framework.
 
 ## Intended data flow
@@ -85,7 +84,7 @@ Keep a labeled dataset with exact phrases, visual descriptions, note paraphrases
 
 ## Assistant bridge and harness
 
-MCP ships in V1. Build it alongside the native interface once the shared memory contract exists; it does not need to wait for the complete Rust migration.
+MCP ships in V1. Build it alongside the native interface once the shared memory contract exists.
 
 The initial surface supports bounded search, explicit memory fetch, and region fetch. Names/wire schemas remain proposed. Search returns compact references; fetching supplies authorized images/crops, selected text, human notes, coordinates, and source evidence. The external client supplies the agent runtime.
 
@@ -117,11 +116,10 @@ The V1 release check restores the same annotated library onto a second Mac. Cont
 
 ## Delivery sequence
 
-Follow [the implementation roadmap](../plan.md): durable memory/ontology → real OCR and hybrid vectors → shared local contract → native capture/search and MCP in parallel → portable-library restore → measured Rust migration and release verification. Python remains the evaluation reference. No dates, completed security audit, encrypted catalog, signed Mac release, or universal assistant compatibility are claimed today.
+Follow [the implementation roadmap](../plan.md): durable memory/ontology → real OCR and hybrid vectors → shared local contract → native capture/search and MCP in parallel → portable-library restore → native engine integration and release verification. Python remains the evaluation reference. No dates, completed security audit, encrypted catalog, signed Mac release, or universal assistant compatibility are claimed today.
 
 ## Primary technical references
 
 - [SQLite application use cases](https://www.sqlite.org/whentouse.html), [FTS5](https://www.sqlite.org/fts5.html), and [sqlite-vec](https://alexgarcia.xyz/sqlite-vec/).
 - [Apple ScreenCaptureKit](https://developer.apple.com/documentation/screencapturekit/scscreenshotmanager) and [Vision](https://developer.apple.com/documentation/vision).
 - [MCP transports](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports).
-- [UniFFI Swift/Rust bindings](https://mozilla.github.io/uniffi-rs/latest/) as an integration candidate.

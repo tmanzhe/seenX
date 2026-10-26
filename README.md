@@ -12,7 +12,6 @@ The first-release loop is **capture → highlight or pin → add an optional not
 | --- | --- |
 | [Website and docs](apps/web/README.md) | Working sample capture, image search, text highlights, point/region notes, browser persistence, and JSON context export. [Live website](https://seenx-lovat.vercel.app). |
 | [Python engine](python/README.md) | Image/PDF reading, optional macOS OCR, text/visual/hybrid search, caching, diagnostics, and an initial durable image/revision/region-note catalog with CLI import, edit, fetch, and removal. |
-| [Rust core](crates/seenx-core/README.md) | A dependency-free scaffold; no production catalog or retrieval implementation. |
 | [Mac application](apps/macos/README.md) | Documentation only. Native capture, global search, and the MCP bridge are not implemented. |
 
 The website uses authored samples and keyword matching. It does not read personal files, run semantic models, perform real OCR, or connect an assistant. Python now has a separate versioned memory catalog alongside the disposable extraction cache; its notes aren't connected to retrieval yet. Existing OCR returns text strings; preserving text boxes is the next step. Follow [the catalog lesson](python/docs/catalog.md) to import an image and save a region note that survives restart.
@@ -36,9 +35,9 @@ Local storage and search are separate from sharing results: content returned to 
 2. **Real searchable evidence:** OCR boxes, FTS5, visual vectors, semantic note retrieval, and reproducible ranking evaluation.
 3. **Shared local engine contract:** import, annotate, search, fetch memory/region, export, remove, and indexing jobs.
 4. **Native capture and search:** SwiftUI/AppKit command bar, capture HUD, and platform adapters.
-5. **MCP and agent evaluations:** build alongside the native UI once shared contracts exist, not after a second release or a complete Rust rewrite.
+5. **MCP and agent evaluations:** build alongside the native UI once shared contracts exist.
 6. **Portable library and restore:** versioned complete/context-only archives, relinking, optional encryption, and new-laptop restore checks; reconnect access deliberately.
-7. **Production handoff and beta:** gradually migrate proven behavior to Rust; verify model/runtime packaging, offline behavior, permissions, and distribution.
+7. **Production handoff and beta:** verify model/runtime packaging, offline behavior, permissions, and distribution. Use the working Swift app and Python reference to guide engine integration.
 
 Portable library transfer remains planned; the website currently exports single-memory JSON, not a backup of your real images or laptop.
 
@@ -50,7 +49,6 @@ The complete milestones and completion criteria are in [the implementation plan]
 | --- | --- |
 | [apps/web](apps/web/README.md) | Product website, public roadmap, sample interaction, and documentation |
 | [Python engine](python/README.md) | Current prototype and evaluation reference |
-| [crates/seenx-core](crates/seenx-core/README.md) | Planned production memory engine |
 | [apps/macos](apps/macos/README.md) | Planned native capture, permissions, search, and annotation interface |
 | [docs/architecture.md](docs/architecture.md) | Stack decisions and implementation boundaries |
 | [plan.md](plan.md) | Ordered milestones, acceptance criteria, and immediate next step |
@@ -73,13 +71,9 @@ npm run typecheck
 npm run build
 ```
 
-The export is written to `apps/web/out/`. Website notes are browser-local sample data; they are separate from any future native database. Rust 1.85 or newer can validate the scaffold with:
+The export is written to `apps/web/out/`. Website notes are browser-local sample data; they are separate from the native library.
 
-```sh
-cargo check --offline --workspace
-```
-
-The production target does not require users to install Python. Keep Python as the development reference and port small tested slices instead of rewriting everything at once. Full Xcode setup becomes necessary for native development.
+The production target does not require users to install Python. Keep Python as the development reference and integrate small tested slices into the native app. Full Xcode setup becomes necessary for native development.
 
 ## Website deployment
 

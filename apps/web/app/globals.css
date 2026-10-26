@@ -879,38 +879,7 @@ body, .docs-site { background: var(--paper); color: var(--ink); }
 :root[data-theme="dark"] .prose pre { background: #0b1214; color: #d9e9df; }
 :root[data-theme="dark"] .hero-footnote, :root[data-theme="dark"] .sidebar-link, :root[data-theme="dark"] .demo-status, :root[data-theme="dark"] .image-caption > span, :root[data-theme="dark"] .local-copy p, :root[data-theme="dark"] .ways-grid article > p, :root[data-theme="dark"] .footer-links { color: var(--muted); }
 
-/* Continuous loading / retrieval illustration; never represents live indexing. */
-.memory-motion { max-width: 460px; margin: 28px auto 0; padding: 18px 24px 12px; border: 1px solid var(--line); border-radius: 15px; background: var(--glass); }
-.motion-stage { height: 77px; display: flex; justify-content: center; align-items: center; }
-.motion-source { width: 50px; height: 56px; border: 1px solid var(--line); border-radius: 6px; padding: 12px 8px; position: relative; overflow: hidden; }
-.motion-source > span { display: block; height: 3px; margin-bottom: 6px; border-radius: 2px; background: var(--muted); opacity: .4; }
-.motion-source > span:nth-child(2) { width: 65%; }
-.motion-scan { position: absolute; left: 0; right: 0; height: 2px; top: 0; background: var(--accent); box-shadow: 0 -8px 14px color-mix(in srgb, var(--signal) 50%, transparent); animation: signal-scan 3s ease-in-out infinite; }
-.motion-track { display: flex; gap: 6px; width: 74px; justify-content: center; }
-.motion-track i, .motion-dots i { display: block; width: 4px; height: 4px; border-radius: 50%; background: var(--accent); animation: signal-dot 1.5s ease-in-out infinite; }
-.motion-track i:nth-child(2), .motion-dots i:nth-child(2) { animation-delay: .2s; }
-.motion-track i:nth-child(3), .motion-dots i:nth-child(3) { animation-delay: .4s; }
-.motion-mark { display: grid; grid-template-columns: repeat(2, 17px); gap: 5px; transform: rotate(-4deg); }
-.motion-mark i { height: 17px; background: var(--brand); border-radius: 3px; animation: signal-assemble 3s cubic-bezier(.4,0,.2,1) infinite; }
-.motion-mark i:nth-child(2) { animation-delay: .15s; }
-.motion-mark i:nth-child(3) { animation-delay: .3s; }
-.motion-mark i:nth-child(4) { animation-delay: .45s; }
-.motion-result { width: 50px; height: 56px; border: 1px solid var(--line); border-radius: 6px; padding: 9px; position: relative; animation: signal-result 3s ease-in-out infinite; }
-.motion-result span { display: block; height: 5px; background: var(--muted); opacity: .35; border-radius: 2px; margin-bottom: 5px; }
-.motion-result span:nth-child(2) { width: 65%; }
-.motion-result b { display: block; text-align: right; color: var(--accent); font-size: 18px; font-weight: 400; }
-.motion-caption { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--line); padding-top: 10px; font-size: 10px; color: var(--muted); gap: 10px; text-align: left; }
-.motion-caption > span { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
-.motion-caption small { opacity: .75; font-size: 8px; }
-.motion-caption button { border: none; background: transparent; padding: 4px; color: var(--muted); font-size: 9px; text-decoration: underline; text-underline-offset: 3px; }
-.motion-dots { display: flex; gap: 3px; }
-@keyframes signal-scan { 0%, 100% { transform: translateY(3px); opacity: .25; } 50% { transform: translateY(49px); opacity: 1; } }
-@keyframes signal-dot { 0%, 100% { opacity: .2; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-3px); } }
-@keyframes signal-assemble { 0%, 100% { transform: translate(0,0) rotate(0); opacity: 1; } 40% { transform: translate(-3px,-4px) rotate(-12deg); opacity: .35; } 70% { transform: translate(0,0) rotate(0); opacity: 1; } }
-@keyframes signal-result { 0%, 20%, 100% { opacity: .4; transform: translateY(3px); } 60%, 80% { opacity: 1; transform: translateY(0); } }
-.memory-motion[data-paused="true"] *, .memory-motion[data-paused="true"] *::after { animation-play-state: paused; }
-@media (max-width: 480px) { .memory-motion { padding: 12px 15px; } .motion-track { width: 42px; } .site-header .theme-toggle { margin-left: auto; } .docs-header-main { gap: 12px; } }
-@media (prefers-reduced-motion: reduce) { .memory-motion *, .memory-motion *::after { animation: none !important; } .motion-scan { display: none; } }
+@media (max-width: 480px) { .site-header .theme-toggle { margin-left: auto; } .docs-header-main { gap: 12px; } }
 /* Keep supporting text and controls legible in the dark material palette. */
 :root[data-theme="dark"] .docs-brand > a:last-child, :root[data-theme="dark"] .docs-back-link, :root[data-theme="dark"] .docs-build-status, :root[data-theme="dark"] .docs-sidebar-project, :root[data-theme="dark"] .docs-pagination, :root[data-theme="dark"] .page-outline > span, :root[data-theme="dark"] .learning-entry-kind, :root[data-theme="dark"] .learning-takeaway, :root[data-theme="dark"] .learning-takeaway > span, :root[data-theme="dark"] .learning-agreement, :root[data-theme="dark"] .learning-next span, :root[data-theme="dark"] .learning-done strong, :root[data-theme="dark"] .notebook-storage, :root[data-theme="dark"] .notebook-draft-help, :root[data-theme="dark"] .notebook-empty, :root[data-theme="dark"] .learning-closing > span, :root[data-theme="dark"] .support-description, :root[data-theme="dark"] .support-options p { color: var(--muted); }
 :root[data-theme="dark"] .audience-tabs { background: var(--surface); border-color: var(--line); }

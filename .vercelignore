@@ -6,13 +6,10 @@ node_modules
 **/.next
 apps/web/out
 /python/
-/experiments/
-/crates/
 /apps/macos/
 /docs/
 /models/
 /practice-images/
-/target/
 .venv
 **/.venv
 **/__pycache__

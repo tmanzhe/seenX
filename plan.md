@@ -12,9 +12,8 @@ This plan supersedes the earlier sequence that put a broad ontology experiment b
 
 - **Website:** working authored sample capture, image results, text selection, pins/regions, notes, browser persistence, Command/Ctrl K, and JSON context export. No real image access, OCR, vector inference, or assistant connection.
 - **Python:** image/PDF reading, macOS Vision OCR strings and persisted text-region boxes, literal text search, CLIP visual vectors, hybrid rank fusion, optional SQLite extraction/vector cache, diagnostics, and tests. The durable catalog supports image import, immutable snapshots/revisions, whole-image/point/region notes, quoted OCR observations, revision-aware fetch, and transactional edit/remove through `seenx-memory`. Version-1 catalogs migrate atomically to version 2.
-- **Rust:** dependency-free library scaffold only.
 - **Native app:** initial SwiftUI/AppKit menu-bar frontend with translucent search, global shortcuts, system region screenshots, Vision text-box highlights, notes, and its own local development library. It does not yet use the Python catalog or retrieval engine. See [native setup and shortcuts](apps/macos/README.md).
-- **Shared API/MCP:** not implemented. The native frontend has no Rust dependency; production engine language selection remains open.
+- **Shared API/MCP:** not implemented. Integrate the Swift frontend with measured retrieval behavior behind a shared contract.
 - **FTS5, word/range selection, semantic note embeddings, sqlite-vec, and catalog-note search integration:** not implemented.
 
 ## 01 — Durable local memory + lightweight ontology · IN PROGRESS
@@ -56,7 +55,7 @@ Define operations for import, annotate, search, fetch memory, fetch region, expo
 - Enforce selected-source and collection access in the engine; callers cannot bypass authorization by requesting another record ID.
 - Keep image/note contents out of diagnostic logs by default. Treat retrieved text as data, not executable instructions.
 
-**Done when:** a local client can save a note, retrieve matching evidence, export it, and remove it through a tested versioned contract. Begin MCP adapter work here; do not wait for the Rust migration.
+**Done when:** a local client can save a note, retrieve matching evidence, export it, and remove it through a tested versioned contract. Begin MCP adapter work here alongside native integration.
 
 ## 04 — Native capture, annotations, and command bar · V1
 
@@ -97,9 +96,9 @@ MCP is a release capability, not a promise to build a general autonomous agent p
 
 ## 07 — Production migration and desktop beta · V1 release gate
 
-- Select the production engine language after measurement; optionally migrate catalog, indexing, ranking, and access behavior in small slices behind the same contract. The native frontend does not require Rust.
+- Integrate catalog, indexing, ranking, and access behavior into the Swift app in small measured slices behind the shared contract.
 - Reuse Python datasets, model revisions, preprocessing, and result fixtures; record numeric tolerances and regression results.
-- Select a local model runtime after compatibility and packaging checks. Core ML/ONNX and a Swift/Rust binding such as UniFFI are candidates, not implemented dependencies.
+- Select a local model runtime after compatibility and packaging checks. Core ML/ONNX are candidates, not implemented dependencies.
 - Ship without asking users to install Python; retain Python as the evaluation reference.
 - Verify offline operation after model downloads, migration/recovery, interrupted indexing, source removal, derived-index deletion, exports, access revocation, and resource use.
 - Complete signing/notarization, clean-machine installation, licensing, and the supported assistant setup.

@@ -14,8 +14,7 @@ __pycache__/
 .pytest_cache/
 *.egg-info/
 
-# Rust and Swift build output
-/target/
+# Swift build output
 .build/
 DerivedData/
 xcuserdata/

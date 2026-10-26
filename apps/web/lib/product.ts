@@ -34,7 +34,7 @@ export const roadmapStages = [
   {
     number: "05", title: "Read-only MCP bridge + agent evaluation harness", status: "Planned", scope: "V1 · parallel with native UI",
     goal: "Let a compatible assistant retrieve the right memory, highlight, and human intention.",
-    tasks: ["Start bridge work once the memory and engine contracts exist; do not wait for the Rust migration or a second release.", "Expose bounded search and explicit memory/region fetch over authorized collections. Start with a local stdio client and verify its setup.", "An evaluation harness tests search → select → fetch, source grounding, coordinate accuracy, no-match behavior, and access denial.", "The external client runs the agent. SeenX supplies read-only evidence, not an autonomous agent runtime or arbitrary filesystem access."],
+    tasks: ["Start bridge work alongside native integration once the memory and engine contracts exist.", "Expose bounded search and explicit memory/region fetch over authorized collections. Start with a local stdio client and verify its setup.", "An evaluation harness tests search → select → fetch, source grounding, coordinate accuracy, no-match behavior, and access denial.", "The external client runs the agent. SeenX supplies read-only evidence, not an autonomous agent runtime or arbitrary filesystem access."],
     done: "A tested client retrieves the same image, selected text, coordinates, and notes as human search; revoked sources are unavailable to future requests. Cloud disclosure is explicit.",
   },
   {
@@ -46,7 +46,7 @@ export const roadmapStages = [
   {
     number: "07", title: "Production engine + desktop beta", status: "Planned", scope: "V1 release gate",
     goal: "Package a reliable, inspectable local app rather than a collection of demos.",
-    tasks: ["Gradually replace proven Python engine responsibilities with Rust while keeping contract and retrieval parity. Python remains the evaluation reference.", "Choose local model runtimes after packaging and preprocessing checks; a Core ML integration or Swift/Rust binding is not already implemented.", "Validate offline operation after model installation, indexing recovery, note/search updates, deletion, exports, access revocation, and resource use.", "Complete signing, notarization, installation checks, licensing, and the first supported assistant setup."],
+    tasks: ["Integrate proven catalog and retrieval behavior into the Swift app behind the shared contract. Python remains the evaluation reference.", "Choose local model runtimes after packaging and preprocessing checks; a Core ML integration is not already implemented.", "Validate offline operation after model installation, indexing recovery, note/search updates, deletion, exports, access revocation, and resource use.", "Complete signing, notarization, installation checks, licensing, and the first supported assistant setup."],
     done: "A clean Mac install completes real capture → annotate → restart → human search → assistant retrieval, plus verified export and restore on a second Mac. Production does not require users to install Python.",
   },
 ] as const;
@@ -57,6 +57,5 @@ export const stackChoices = [
   ["Persistent memory", "SQLite + FTS5", "Planned catalog, exact text index, notes, source versions, permissions, and typed relationships."],
   ["Semantic retrieval", "Local image/text vectors", "Existing CLIP baseline; note embeddings and sqlite-vec evaluation are planned. Unrelated embedding spaces stay separate."],
   ["Native interface", "SwiftUI + AppKit + ScreenCaptureKit + Vision", "Planned capture, command bar, source permissions, OCR boxes, and annotation UI."],
-  ["Production core", "Rust", "Dependency-free scaffold today; migrate measured behavior gradually."],
   ["Assistant access", "MCP", "Read-only V1 plan using the shared engine; no native bridge runs on this website."],
 ] as const;
