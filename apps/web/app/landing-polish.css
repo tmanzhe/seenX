@@ -1,5 +1,5 @@
 /* Product presentation. The working preview remains the primary action. */
-.landing-page { --landing-header-height: 90px; --demo-peek: 168px; --polish-ease: cubic-bezier(.22,1,.36,1); background: radial-gradient(ellipse at 50% 6%, color-mix(in srgb, var(--panel) 65%, transparent), transparent 29%); }
+.landing-page { --landing-header-height: 90px; --demo-peek: 224px; --polish-ease: cubic-bezier(.22,1,.36,1); background: radial-gradient(ellipse at 50% 6%, color-mix(in srgb, var(--panel) 65%, transparent), transparent 29%); }
 .site-header { padding-top: 16px; padding-bottom: 10px; }
 .site-header .nav-inner { max-width: 1192px; min-height: 64px; padding: 0 25px; border-radius: 20px; background: color-mix(in srgb, var(--panel) 72%, transparent); box-shadow: inset 0 1px 0 rgb(255 255 255 / .45), 0 6px 25px -15px rgb(38 78 133 / .16); }
 .site-header .button-small { border-radius: 12px; padding: 10px 16px; }
@@ -113,7 +113,7 @@
   .premium-hero h1 { letter-spacing: -4.5px; }
 }
 @media (max-width: 700px) {
-  .landing-page { --landing-header-height: 77px; --demo-peek: 120px; }
+  .landing-page { --landing-header-height: 77px; --demo-peek: 164px; }
   .site-header { padding: 10px 12px; }
   .site-header .nav-inner { padding: 0 13px; min-height: 57px; border-radius: 16px; }
   .site-header .button-small { padding: 9px 11px; }
