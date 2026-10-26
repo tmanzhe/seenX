@@ -11,8 +11,8 @@ The hosted website is a separate static preview. It never becomes the user's loc
 | Layer | Exists today | Planned work |
 | --- | --- | --- |
 | Website | Next.js/React/TypeScript, sample capture, authored text boxes, spatial annotations, localStorage, JSON export | Maintain truthful product/docs copy and demo behavior |
-| Python prototype | Image/PDF reading, Vision OCR strings, literal search, CLIP vectors, rank fusion, SQLite cache, diagnostics, initial versioned image/revision/region-note catalog | OCR boxes and observation links, richer catalog relationships/collections, FTS5, semantic note retrieval, local engine contract, portable export |
-| Native Mac app | Documentation only | SwiftUI/AppKit command bar and capture HUD; ScreenCaptureKit, Vision, source permissions |
+| Python prototype | Image/PDF reading, Vision OCR strings/boxes, literal search, CLIP vectors, rank fusion, SQLite cache, diagnostics, versioned memory catalog and OCR quote links | Word/range selection, richer catalog relationships/collections, FTS5, semantic note retrieval, local engine contract, portable export |
+| Native Mac app | Initial SwiftUI/AppKit menu-bar app: translucent search, global shortcuts, system region capture, Vision text highlights, notes, separate local development library | Shared-engine integration, ScreenCaptureKit adapter, source permissions, production distribution |
 | Rust core | Dependency-free scaffold | Gradual migration of proven storage, indexing, retrieval, and access logic |
 | Assistant bridge | Website illustration and export only | Opt-in, bounded read-only MCP retrieval; client integration/evaluation |
 
@@ -24,7 +24,7 @@ The hosted website is a separate static preview. It never becomes the user's loc
 - **Vector search can remain embedded:** evaluate sqlite-vec against exact scanning. SQLite and vector retrieval are complementary, not alternative product directions. No vector extension is installed in the production core today.
 - **Python is the development reference:** existing code proves behavior before a port. A bounded local service can connect prototype clients; FastAPI is a candidate, not an existing server.
 - **SwiftUI/AppKit own native interaction:** capture, hotkeys, floating panels, platform permissions, OCR adapters, and annotations.
-- **Rust is the production engine target:** small measured migrations behind stable contracts, without a required Python runtime for users. Swift/Rust bindings and local inference runtimes are evaluated at their first integration.
+- **The production engine language remains open:** the native frontend does not depend on Rust. Evaluate small measured migrations behind stable contracts rather than requiring a rewrite; Swift/Rust bindings are only a candidate if Rust is selected.
 - **MCP is the assistant interface:** first-release scope, not a second independent search system or an autonomous agent framework.
 
 ## Intended data flow
@@ -59,6 +59,8 @@ Image bytes and thumbnails live in app-managed files; SQLite links their records
 Use normalized top-left coordinates over the full orientation-corrected image. Convert Apple Vision's coordinate convention at the adapter boundary; screen points, backing pixels, crops, and letterboxed previews must not be conflated. Exports identify the reference image/version and dimensions as well as normalized targets and pixel bounds.
 
 The first Python catalog implements those ownership links with SQLite foreign keys and retains exact imported bytes as content-addressed objects. Dimensions and annotation coordinates refer to the EXIF-corrected display; stored bytes keep their original orientation metadata. `seenx-memory` exposes import, whole-image/point/region annotation, revision-aware fetch, edit, and logical removal. It checks snapshot hashes on fetch and is independent of the retrieval cache. See [the catalog lesson](../python/docs/catalog.md) for retention limits and remaining work. Current removal retains object files; garbage collection, complete-library export, and access-controlled API fetch aren't implemented yet.
+
+Catalog version 2 adds immutable OCR runs and observations. The adapter converts Vision's bottom-left boxes into normalized top-left coordinates after EXIF correction. An annotation may quote an observation only from its own revision; the selected text retains OCR/unverified provenance. A changed recognition configuration creates a new run instead of overwriting linked evidence. The additive version-1 migration, OCR writes, and quote creation are transactional. See [the OCR observation lesson](../python/docs/ocr-observations.md).
 
 ## Lightweight ontology in V1
 

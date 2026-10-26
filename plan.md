@@ -11,16 +11,17 @@ This plan supersedes the earlier sequence that put a broad ontology experiment b
 ## Current implementation
 
 - **Website:** working authored sample capture, image results, text selection, pins/regions, notes, browser persistence, Command/Ctrl K, and JSON context export. No real image access, OCR, vector inference, or assistant connection.
-- **Python:** image/PDF reading, macOS Vision OCR strings, literal text search, CLIP visual vectors, hybrid rank fusion, optional SQLite extraction/vector cache, diagnostics, and tests. The first durable catalog slice supports image import, immutable byte snapshots/revisions, whole-image/point/region notes, fetch with revision history, and transactional edit/remove through `seenx-memory`.
+- **Python:** image/PDF reading, macOS Vision OCR strings and persisted text-region boxes, literal text search, CLIP visual vectors, hybrid rank fusion, optional SQLite extraction/vector cache, diagnostics, and tests. The durable catalog supports image import, immutable snapshots/revisions, whole-image/point/region notes, quoted OCR observations, revision-aware fetch, and transactional edit/remove through `seenx-memory`. Version-1 catalogs migrate atomically to version 2.
 - **Rust:** dependency-free library scaffold only.
-- **Native app/API/MCP:** not implemented.
-- **FTS5, OCR coordinates, semantic note embeddings, sqlite-vec, and catalog-note search integration:** not implemented.
+- **Native app:** initial SwiftUI/AppKit menu-bar frontend with translucent search, global shortcuts, system region screenshots, Vision text-box highlights, notes, and its own local development library. It does not yet use the Python catalog or retrieval engine. See [native setup and shortcuts](apps/macos/README.md).
+- **Shared API/MCP:** not implemented. The native frontend has no Rust dependency; production engine language selection remains open.
+- **FTS5, word/range selection, semantic note embeddings, sqlite-vec, and catalog-note search integration:** not implemented.
 
 ## 01 — Durable local memory + lightweight ontology · IN PROGRESS
 
 Build a versioned SQLite catalog that is separate from the disposable extraction cache.
 
-The initial version-1 image/revision/region/annotation schema and local CLI are implemented. Separate-process checks recover a real image's note and target after restart and preserve old annotations when the source changes or disappears. The first typed ownership links use foreign keys. This is a vertical slice: collections/tags, richer assertions, OCR observation grounding, thumbnails, later schema migrations, and portable export remain unfinished. See [the catalog lesson](python/docs/catalog.md).
+The image/revision/region/annotation schema and local CLI are implemented. Separate-process checks recover notes and targets after restart and preserve old annotations when sources change or disappear. Version 2 adds immutable OCR runs, normalized boxes, and annotation quote links while preserving existing data. The typed links use foreign keys and revision guards. Collections/tags, richer assertions, word/range grounding, thumbnails, and portable export remain unfinished. See [the catalog lesson](python/docs/catalog.md) and [OCR observations](python/docs/ocr-observations.md).
 
 - Stable asset and immutable revision IDs; content hash, normalized orientation, dimensions, source references, and thumbnails.
 - Whole-image notes, selected text, point targets, and rectangular regions using normalized top-left coordinates.
@@ -32,6 +33,8 @@ The initial version-1 image/revision/region/annotation schema and local CLI are 
 **Done when:** import one real screenshot, save a region note, restart, and recover the original image revision, selected text, note, and aligned location. Update/delete operations are transactional and repeatable.
 
 ## 02 — Real OCR and hybrid retrieval · V1
+
+The initial OCR-region persistence and quote-selection slice is implemented and was exercised with real Vision output. It preserves line/region boxes and marks transcription as unverified; it doesn't yet provide word/range selection or catalog search.
 
 - Extend Vision OCR to retain text observations and word/range locations, not just a combined string.
 - Normalize Vision coordinates, EXIF orientation, screen points, and image pixels into the shared image coordinate system.
@@ -94,7 +97,7 @@ MCP is a release capability, not a promise to build a general autonomous agent p
 
 ## 07 — Production migration and desktop beta · V1 release gate
 
-- Gradually implement measured catalog, indexing, ranking, and access behavior in Rust behind the same contract.
+- Select the production engine language after measurement; optionally migrate catalog, indexing, ranking, and access behavior in small slices behind the same contract. The native frontend does not require Rust.
 - Reuse Python datasets, model revisions, preprocessing, and result fixtures; record numeric tolerances and regression results.
 - Select a local model runtime after compatibility and packaging checks. Core ML/ONNX and a Swift/Rust binding such as UniFFI are candidates, not implemented dependencies.
 - Ship without asking users to install Python; retain Python as the evaluation reference.
@@ -109,6 +112,6 @@ Continuous multi-device sync, concurrent-note conflict handling, PDFs and bookma
 
 ## Immediate next step
 
-Extend the existing Python Vision adapter to return text boxes in the catalog's orientation-corrected coordinate system. Persist OCR observations with provenance and connect user-selected text to those observations. The initial import → region note → restart → fetch loop is implemented; use it as the foundation for retrieval, native capture, and MCP without starting a full rewrite.
+Add FTS5 catalog retrieval over notes, user-selected text, and saved OCR observations, returning stable memory/revision/annotation/observation IDs and method evidence. Test edits and deletion propagation and compare results on labeled queries. The persistence and OCR-region quote loops are implemented; build on those contracts before adding a service or native/MCP clients.
 
 See [architecture](docs/architecture.md), [the Python walkthrough](python/README.md), and [the public website roadmap](https://seenx-lovat.vercel.app/docs/roadmap).

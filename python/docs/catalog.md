@@ -4,6 +4,8 @@ This is the first slice of the visual-memory product. The existing search comman
 
 The goal for this step is deliberately small: import an image, attach a region note, close the process, then recover the same image version and aligned note.
 
+That first loop is implemented. The [next lesson](ocr-observations.md) adds saved OCR boxes and quoted annotations, with an atomic migration to catalog version 2.
+
 ## 1. Import an existing image
 
 From the repository root, replace the filename below with an image you added:
@@ -37,7 +39,7 @@ Those four coordinates mean `x`, `y`, `width`, and `height`, measured from the t
 
 The region must fit inside `[0, 1]` and have positive width and height. For a point use `--point 0.4 0.6` instead. Omitting both makes a whole-image note. A note or selected text is required; selected text alone is allowed. Text supplied here is a user selection, not an OCR-verified quote. Native selection and OCR box grounding come later.
 
-The result includes `annotation_id` and `region_id`. The annotation records its origin as `user` and confirmation as `confirmed`: it was explicitly supplied through this command, not inferred by a model. We don't support model-proposed catalog annotations yet.
+The result includes `annotation_id` and `region_id`. A manually supplied annotation records its origin as `user` and confirmation as `confirmed`. OCR observations stay separate and unverified; annotations can now quote them through `--observation`. The quote's selected-text provenance remains OCR rather than becoming a user-confirmed transcription. General model-proposed notes aren't supported.
 
 ## 3. Recover it in another process
 
@@ -104,7 +106,7 @@ Snapshots are published only after all bytes are written, then database records 
 - **Primary key:** the unique ID for one row, such as an annotation ID.
 - **Foreign key:** an enforced reference to another row. An annotation can't point at a nonexistent region.
 - **Transaction:** a group of database changes that commit together or roll back together. Region and note creation use one transaction, so a failure can't save half the annotation.
-- **Schema version:** the database layout's version. We initialize version 1 and reject unknown versions. Future migration steps will be added as the schema changes; we don't silently downgrade a newer catalog.
+- **Schema version:** the database layout's version. The original version-1 schema now migrates transactionally to version 2 for OCR observations and quote links. Unknown versions are rejected; we don't silently downgrade a newer catalog.
 - **Content-addressed storage:** name a stored object using its byte hash. Identical bytes can reuse the same object. Hash checks detect later snapshot damage.
 - **Class/context manager:** `Catalog` keeps a database connection together with its operations; `with Catalog(...)` closes the connection reliably.
 - **Provenance:** retain where information came from. Imported evidence and user-written meaning have different origins.
@@ -115,6 +117,6 @@ The catalog commands share our local diagnostics. Logs include operation names a
 
 This step proves import → annotate → restart → recover, with changed/missing-original handling, snapshot verification, and transactional edit/delete behavior. The tests use placeholder bytes and mocked image decoding, not generated image fixtures. We also exercised the CLI in separate processes using existing practice photos in an isolated temporary library; the original practice files were unchanged.
 
-The current search command still searches selected folders and derived caches. It doesn't yet search catalog notes. There is no native annotation UI, OCR-box selection, FTS5 catalog index, thumbnail generator, complete-library archive, encryption, source/collection authorization, local service, or MCP endpoint in this slice.
+The current search command still searches selected folders and derived caches. It doesn't yet search catalog notes. Saved OCR-region selection is available through the CLI, but there is no native annotation UI, FTS5 catalog index, thumbnail generator, complete-library archive, encryption, source/collection authorization, local service, or MCP endpoint in this slice.
 
-Next: extend Vision OCR to retain boxes in the shared coordinate system, then connect selected text and notes to catalog retrieval. Collections, tags, richer assertions, migrations beyond version 1, and export/restore remain part of the larger roadmap.
+Continue with [the OCR observation lesson](ocr-observations.md), then connect selected text and notes to catalog retrieval. Collections, tags, richer assertions, and export/restore remain part of the larger roadmap.

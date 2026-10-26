@@ -25,6 +25,8 @@ def main() -> None:
     getter = commands.add_parser("get", help="Fetch a memory, annotations, and verified snapshot reference")
     getter.add_argument("asset_id")
     getter.add_argument("--revision", help="Fetch an older revision rather than the current one")
+    ocr = commands.add_parser("ocr", help="Save text and bounding boxes for an immutable revision (macOS)")
+    ocr.add_argument("revision_id")
     note = commands.add_parser("note", help="Save user-authored context against an image revision")
     note.add_argument("revision_id")
     note.add_argument("--note", default="")
@@ -32,6 +34,7 @@ def main() -> None:
     target = note.add_mutually_exclusive_group()
     target.add_argument("--region", type=float, nargs=4, metavar=("X", "Y", "WIDTH", "HEIGHT"))
     target.add_argument("--point", type=float, nargs=2, metavar=("X", "Y"))
+    target.add_argument("--observation", help="Quote a saved OCR observation, using its text and region")
     edit = commands.add_parser("edit", help="Edit note/selected text, preserving its ID and target")
     edit.add_argument("annotation_id")
     edit.add_argument("--note")
@@ -52,8 +55,11 @@ def main() -> None:
                     result = catalog.list_memories()
                 elif args.command == "get":
                     result = catalog.get_memory(args.asset_id, args.revision)
+                elif args.command == "ocr":
+                    result = catalog.recognize_text(args.revision_id)
                 elif args.command == "note":
-                    result = catalog.add_note(args.revision_id, args.note, args.selected_text, args.region, args.point)
+                    result = catalog.add_note(args.revision_id, args.note, args.selected_text,
+                                              region=args.region, point=args.point, observation_id=args.observation)
                 elif args.command == "edit":
                     if args.note is None and args.selected_text is None:
                         raise ValueError("Provide --note or --selected-text")
