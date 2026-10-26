@@ -62,7 +62,7 @@ uv sync --project python --all-extras
 uv run --project python seenx-search practice-images --mode hybrid --ocr --cache --query "basketball"
 ```
 
-For the website, use Node.js 20.9 or newer:
+For the website, use Node.js 24 (also recorded in `.node-version`):
 
 ```sh
 npm ci
@@ -72,6 +72,8 @@ npm run build
 ```
 
 The export is written to `apps/web/out/`. Website notes are browser-local sample data; they are separate from the native library.
+
+For a repeatable container build, run `docker compose up --build` and open <http://127.0.0.1:8080>. See [development and CI](docs/development.md) for the build, checks, and supported platforms, and [the security review](docs/security-review.md) for findings and limits.
 
 The production target does not require users to install Python. Keep Python as the development reference and integrate small tested slices into the native app. Full Xcode setup becomes necessary for native development.
 
