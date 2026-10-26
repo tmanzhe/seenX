@@ -47,3 +47,6 @@ npm-debug.log*
 /python/data/
 /python/outputs/
 /python/.cache/
+
+# Durable personal memories (not a disposable cache)
+/python/library/

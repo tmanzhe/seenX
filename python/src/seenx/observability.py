@@ -19,7 +19,8 @@ LOGGER = logging.getLogger("seenx")
 LOGGER.addHandler(logging.NullHandler())
 LOGGER.propagate = False
 CURRENT_RUN = ContextVar("seenx_run", default=None)
-PRIVATE_FIELDS = {"query", "path", "text", "record", "embedding", "error", "message"}
+PRIVATE_FIELDS = {"query", "path", "text", "record", "embedding", "error", "message",
+                  "note", "selected_text", "source_path", "snapshot_path"}
 
 
 class JsonFormatter(logging.Formatter):

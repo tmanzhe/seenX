@@ -11,7 +11,7 @@ The hosted website is a separate static preview. It never becomes the user's loc
 | Layer | Exists today | Planned work |
 | --- | --- | --- |
 | Website | Next.js/React/TypeScript, sample capture, authored text boxes, spatial annotations, localStorage, JSON export | Maintain truthful product/docs copy and demo behavior |
-| Python prototype | Image/PDF reading, Vision OCR strings, literal search, CLIP vectors, rank fusion, SQLite cache, diagnostics | Durable memory catalog, OCR boxes, notes, typed links, FTS5, semantic note retrieval, local engine contract |
+| Python prototype | Image/PDF reading, Vision OCR strings, literal search, CLIP vectors, rank fusion, SQLite cache, diagnostics, initial versioned image/revision/region-note catalog | OCR boxes and observation links, richer catalog relationships/collections, FTS5, semantic note retrieval, local engine contract, portable export |
 | Native Mac app | Documentation only | SwiftUI/AppKit command bar and capture HUD; ScreenCaptureKit, Vision, source permissions |
 | Rust core | Dependency-free scaffold | Gradual migration of proven storage, indexing, retrieval, and access logic |
 | Assistant bridge | Website illustration and export only | Opt-in, bounded read-only MCP retrieval; client integration/evaluation |
@@ -57,6 +57,8 @@ Capture and note saving should not block on embedding inference. Use bounded bac
 Image bytes and thumbnails live in app-managed files; SQLite links their records. Newly captured images can be owned by the app. Imported originals remain untouched. If an imported file changes, create a new revision rather than silently attaching old notes to different pixels. Decide snapshot retention deliberately so annotations can preserve their original evidence.
 
 Use normalized top-left coordinates over the full orientation-corrected image. Convert Apple Vision's coordinate convention at the adapter boundary; screen points, backing pixels, crops, and letterboxed previews must not be conflated. Exports identify the reference image/version and dimensions as well as normalized targets and pixel bounds.
+
+The first Python catalog implements those ownership links with SQLite foreign keys and retains exact imported bytes as content-addressed objects. Dimensions and annotation coordinates refer to the EXIF-corrected display; stored bytes keep their original orientation metadata. `seenx-memory` exposes import, whole-image/point/region annotation, revision-aware fetch, edit, and logical removal. It checks snapshot hashes on fetch and is independent of the retrieval cache. See [the catalog lesson](../python/docs/catalog.md) for retention limits and remaining work. Current removal retains object files; garbage collection, complete-library export, and access-controlled API fetch aren't implemented yet.
 
 ## Lightweight ontology in V1
 

@@ -7,3 +7,4 @@ REPO_ROOT = PYTHON_ROOT.parent
 CACHE_PATH = PYTHON_ROOT / ".cache" / "records.sqlite3"
 LOG_PATH = PYTHON_ROOT / ".cache" / "logs" / "search.jsonl"
 MODEL_CACHE = REPO_ROOT / "models" / "huggingface"
+LIBRARY_ROOT = PYTHON_ROOT / "library"

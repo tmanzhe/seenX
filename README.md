@@ -11,11 +11,11 @@ The first-release loop is **capture → highlight or pin → add an optional not
 | Component | Current status |
 | --- | --- |
 | [Website and docs](apps/web/README.md) | Working sample capture, image search, text highlights, point/region notes, browser persistence, and JSON context export. [Live website](https://seenx-lovat.vercel.app). |
-| [Python engine](python/README.md) | Image/PDF reading, optional macOS OCR, literal text search, local CLIP vectors, hybrid rank fusion, extraction/vector caching, and diagnostics. |
+| [Python engine](python/README.md) | Image/PDF reading, optional macOS OCR, text/visual/hybrid search, caching, diagnostics, and an initial durable image/revision/region-note catalog with CLI import, edit, fetch, and removal. |
 | [Rust core](crates/seenx-core/README.md) | A dependency-free scaffold; no production catalog or retrieval implementation. |
 | [Mac application](apps/macos/README.md) | Documentation only. Native capture, global search, and the MCP bridge are not implemented. |
 
-The website uses authored samples and keyword matching. It does not read personal files, run semantic models, perform real OCR, or connect an assistant. The Python SQLite cache is not the planned durable memory catalog. Existing OCR returns text strings; preserving text boxes is an upcoming step.
+The website uses authored samples and keyword matching. It does not read personal files, run semantic models, perform real OCR, or connect an assistant. Python now has a separate versioned memory catalog alongside the disposable extraction cache; its notes aren't connected to retrieval yet. Existing OCR returns text strings; preserving text boxes is the next step. Follow [the catalog lesson](python/docs/catalog.md) to import an image and save a region note that survives restart.
 
 ## V1 direction
 

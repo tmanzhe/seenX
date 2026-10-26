@@ -11,14 +11,16 @@ This plan supersedes the earlier sequence that put a broad ontology experiment b
 ## Current implementation
 
 - **Website:** working authored sample capture, image results, text selection, pins/regions, notes, browser persistence, Command/Ctrl K, and JSON context export. No real image access, OCR, vector inference, or assistant connection.
-- **Python:** image/PDF reading, macOS Vision OCR strings, literal text search, CLIP visual vectors, hybrid rank fusion, optional SQLite extraction/vector cache, diagnostics, and tests.
+- **Python:** image/PDF reading, macOS Vision OCR strings, literal text search, CLIP visual vectors, hybrid rank fusion, optional SQLite extraction/vector cache, diagnostics, and tests. The first durable catalog slice supports image import, immutable byte snapshots/revisions, whole-image/point/region notes, fetch with revision history, and transactional edit/remove through `seenx-memory`.
 - **Rust:** dependency-free library scaffold only.
 - **Native app/API/MCP:** not implemented.
-- **FTS5, durable annotation catalog, OCR coordinates, semantic note embeddings, and sqlite-vec:** not implemented.
+- **FTS5, OCR coordinates, semantic note embeddings, sqlite-vec, and catalog-note search integration:** not implemented.
 
-## 01 — Durable local memory + lightweight ontology · NEXT
+## 01 — Durable local memory + lightweight ontology · IN PROGRESS
 
 Build a versioned SQLite catalog that is separate from the disposable extraction cache.
+
+The initial version-1 image/revision/region/annotation schema and local CLI are implemented. Separate-process checks recover a real image's note and target after restart and preserve old annotations when the source changes or disappears. The first typed ownership links use foreign keys. This is a vertical slice: collections/tags, richer assertions, OCR observation grounding, thumbnails, later schema migrations, and portable export remain unfinished. See [the catalog lesson](python/docs/catalog.md).
 
 - Stable asset and immutable revision IDs; content hash, normalized orientation, dimensions, source references, and thumbnails.
 - Whole-image notes, selected text, point targets, and rectangular regions using normalized top-left coordinates.
@@ -107,6 +109,6 @@ Continuous multi-device sync, concurrent-note conflict handling, PDFs and bookma
 
 ## Immediate next step
 
-Define the first asset/revision/annotation schema and extend the existing Python Vision adapter to return text boxes. Import one real screenshot, save one note against a region in SQLite, restart, and retrieve it through a small local command. This creates the foundation for both native capture and MCP without starting a full rewrite.
+Extend the existing Python Vision adapter to return text boxes in the catalog's orientation-corrected coordinate system. Persist OCR observations with provenance and connect user-selected text to those observations. The initial import → region note → restart → fetch loop is implemented; use it as the foundation for retrieval, native capture, and MCP without starting a full rewrite.
 
 See [architecture](docs/architecture.md), [the Python walkthrough](python/README.md), and [the public website roadmap](https://seenx-lovat.vercel.app/docs/roadmap).
