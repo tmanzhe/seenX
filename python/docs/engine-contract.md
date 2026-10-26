@@ -2,7 +2,7 @@
 
 We now have a versioned read-only interface over the Python catalog. A local client can launch `seenx-engine`, send JSON requests on stdin, and read JSON responses on stdout. The process keeps one catalog connection open and handles requests sequentially until stdin closes.
 
-This is the first internal app integration boundary. The native app isn't wired to it yet. It isn't an HTTP endpoint, an MCP server, or a JSON-RPC implementation. There are no new dependencies, network listeners, or model downloads. Keeping the retrieval functions behind this boundary lets a later transport or native implementation preserve the same behavior.
+This is the first internal app integration boundary. The native app's optional **Open Python Library…** browser now uses it through [SeenXEngineClient](../../packages/SeenXEngineClient); see [the native integration lesson](../../docs/native-engine.md). Its main capture launcher/library remain separate. This isn't an HTTP endpoint, an MCP server, or a JSON-RPC implementation. There are no new Python dependencies, network listeners, or model downloads. Keeping the retrieval functions behind this boundary lets a later transport or native implementation preserve the same behavior.
 
 ## Start with a handshake
 

@@ -12,9 +12,9 @@ This plan supersedes the earlier sequence that put a broad ontology experiment b
 
 - **Website:** working authored sample capture, image results, text selection, pins/regions, notes, browser persistence, Command/Ctrl K, and JSON context export. No real image access, OCR, vector inference, or assistant connection.
 - **Python:** image/PDF reading, macOS Vision OCR strings/boxes, folder text/visual/hybrid search, caching, diagnostics, and a durable memory catalog. `seenx-memory` supports import, notes/regions, OCR quotes, revision-aware fetch, FTS5 retrieval over saved notes/selections/OCR, transactional edit/remove, and index rebuild. Version-1/2 catalogs migrate atomically to version 3 while preserving source IDs.
-- **Native app:** initial SwiftUI/AppKit menu-bar frontend with translucent search, global shortcuts, system region screenshots, Vision text-box highlights, notes, and its own local development library. It does not yet use the Python catalog or retrieval engine. See [native setup and shortcuts](apps/macos/README.md).
-- **Shared interface:** version-1 local read-only search, memory fetch, and saved-region fetch through `seenx-engine` JSON process pipes. It returns stable evidence IDs, explicit errors, trace IDs, and optional image/crop attachments. Native integration, write/export operations, access grants, and MCP remain unfinished.
-- **Word/range selection, semantic note embeddings, sqlite-vec, catalog visual/text fusion, and shared native/Python retrieval:** not implemented. Initial lexical catalog retrieval is available through the CLI.
+- **Native app:** SwiftUI/AppKit menu-bar frontend with translucent search, global shortcuts, system region screenshots, Vision text-box highlights, notes, and its own capture library. An optional **Open Python Library…** browser uses the Python search/fetch engine; the main launcher and capture storage remain separate. See [native setup and shortcuts](apps/macos/README.md).
+- **Shared interface:** version-1 local read-only search, memory fetch, and saved-region fetch through `seenx-engine` JSON process pipes, consumed by the typed Swift client. It returns stable evidence IDs, explicit errors, trace IDs, and optional image/crop attachments. Unified capture writes, write/export operations, access grants, and MCP remain unfinished.
+- **Word/range selection, semantic note embeddings, sqlite-vec, and catalog visual/text fusion:** not implemented. Lexical catalog retrieval is available through the CLI and optional native catalog browser.
 
 ## 01 — Durable local memory + lightweight ontology · IN PROGRESS
 
@@ -50,6 +50,8 @@ Catalog FTS5 search is now implemented for notes, selected text, and OCR evidenc
 ## 03 — Shared local engine contract · V1
 
 The read-only slice is implemented: a persistent local process accepts bounded JSON-line requests for capability discovery, catalog search, memory fetch, and saved-region fetch. It checks revision ownership, preserves provenance/coordinate context, omits internal paths, and bounds image attachments. Tests cover invalid input, recovery, limits, and log-content omission; a separate process check decoded a real existing image and crop. See [the engine lesson](python/docs/engine-contract.md). This doesn't finish this milestone: write/export operations, grants, cancellation, and native/MCP integration remain below.
+
+The first native client/browser now uses those operations against an explicitly selected Python library. Helper-process tests cover framing, decoding, limits, method errors, concurrent callers, timeout/cancellation, and shutdown. Native model tests protect against stale results and fatal-transport state; an opt-in real-engine test verifies actual search, image/crop decoding, OCR/point targets, and unchanged original bytes. See [the integration lesson](docs/native-engine.md). Main-launcher capture integration and MCP remain unfinished.
 
 Define operations for import, annotate, search, fetch memory, fetch region, export, and remove. Return stable IDs, model/index revisions, evidence provenance, coordinates, and explicit errors.
 
@@ -115,6 +117,6 @@ Continuous multi-device sync, concurrent-note conflict handling, PDFs and bookma
 
 ## Immediate next step
 
-Connect a native search/fetch client to the version-1 local engine contract. Choose an explicit import path for the separate native development library before adding write operations; preserve unsaved native drafts on helper failure. Evaluate retrieval with labeled queries, and measure lexical and visual behavior before choosing catalog fusion or semantic note embeddings. Add source/collection grants before exposing MCP access.
+Design and implement explicit import/write operations for the separate native capture library, preserving notes, OCR boxes, highlight targets, and original bytes. Then connect the main launcher to the shared catalog. The optional native catalog browser already exercises the version-1 search/fetch contract. Evaluate retrieval with labeled queries, and measure lexical and visual behavior before choosing catalog fusion or semantic note embeddings. Add source/collection grants before exposing MCP access.
 
 See [architecture](docs/architecture.md), [the Python walkthrough](python/README.md), and [the public website roadmap](https://seenx-lovat.vercel.app/docs/roadmap).

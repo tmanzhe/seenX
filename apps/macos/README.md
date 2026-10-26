@@ -1,6 +1,6 @@
 # seenX macOS app
 
-A basic native menu-bar app: a translucent search panel, quick screenshots, and screenshots with text highlights and a note. Built with SwiftUI/AppKit and Apple Vision on macOS 14 or later. This slice uses Apple frameworks without a Python runtime or third-party packages. Shared retrieval integration remains planned.
+A basic native menu-bar app: a translucent search panel, quick screenshots, and screenshots with text highlights and a note. Built with SwiftUI/AppKit and Apple Vision on macOS 14 or later. Capture and native-library search use Apple frameworks without a Python runtime. An optional **Open Python Library…** browser connects to the prepared Python prototype through our local Swift client package.
 
 The interface follows the seenX Design Proposal with a launcher flow: compact glass search, a thumbnail library and saved-image previews inside the same floating panel, an image-led annotation stage with an inline note, and a first-run permission screen. The default is clear white Liquid Glass with a subtle blue tint, independent of the system appearance. macOS 26+ uses native clear Liquid Glass; macOS 14–25 use a frosted fallback. Reduce Transparency uses opaque surfaces.
 
@@ -65,13 +65,15 @@ Search matches words in recognized text, notes, and highlights. An empty query l
 
 ## Storage and boundaries
 
+The menu-bar action **Open Python Library…** opens a separate read-only development browser. Click **Connect…**, choose the seenX repository with its prepared Python environment, and then choose an existing Python library folder containing `catalog.sqlite3`. Search saved notes/selections/OCR, select evidence to fetch its exact image, and switch to a saved-region crop. Full-image previews mark the matching target. Helper failures disconnect safely and preserve the typed query; closing the browser closes its connection. See [the step-by-step integration lesson](../../docs/native-engine.md) for setup, limits, tests, and the rationale.
+
 Screenshots and an atomically written `library.json` manifest live in `~/Library/Application Support/seenX Native/`. Restarting the app reloads this library. These files are separate from the Python catalog and the website's sample data. There is no cloud upload, assistant connection, or automatic access to other folders in this slice.
 
 The app captures only after a deliberate capture action. Its panels are hidden during capture. A new capture does not replace an unfinished annotation draft. The opacity slider adjusts only the glass background; text and controls retain full contrast. The annotation image stays opaque so highlights remain readable. Search remembers its position between shortcut toggles. Movement shortcuts are registered only while the launcher is visible, so other apps regain their usual text-selection shortcuts when it is hidden.
 
 ## Remaining integration
 
-- Connect the native UI to a shared catalog and measured retrieval engine; reconcile the development library through an explicit import/migration rather than silently opening the Python database.
+- Extend the optional shared-engine browser into the main capture/search flow after reconciling the native development library through an explicit import/write design. The browser already uses the Python search/fetch contract; the main launcher and capture storage remain separate.
 - Character-level text selection, editable saved annotations, image import, and library deletion/organization.
 - ScreenCaptureKit capture adapter, supported source metadata, source permission management, portable backup/restore, and an opt-in read-only MCP bridge.
 - Verify Retina/multi-display selection, permission denial/revocation, shortcut conflicts, and alternate keyboard layouts on additional Macs before a release.

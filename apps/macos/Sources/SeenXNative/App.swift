@@ -27,6 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var searchPanel: FloatingPanel?
     private var onboardingPanel: FloatingPanel?
     private var editorPanel: FloatingPanel?
+    private var engineBrowser: EngineBrowserController?
     private var session: AnnotationSession?
     private let shortcuts = GlobalHotKeys()
     private var eventMonitor: Any?
@@ -111,6 +112,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             menu.addItem(item)
         }
         menu.addItem(.separator())
+        let engineItem = NSMenuItem(title: "Open Python Library…", action: #selector(engineLibraryAction), keyEquivalent: "")
+        engineItem.target = self
+        menu.addItem(engineItem)
         let quit = NSMenuItem(title: "Quit seenX", action: #selector(quitAction), keyEquivalent: "q")
         quit.target = self
         menu.addItem(quit)
@@ -140,6 +144,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     @objc private func captureAction() { beginCapture(annotate: false) }
     @objc private func annotateAction() { beginCapture(annotate: true) }
     @objc private func sampleAction() { openSample() }
+    @objc private func engineLibraryAction() {
+        if engineBrowser == nil { engineBrowser = EngineBrowserController() }
+        engineBrowser?.showWindow(nil)
+        engineBrowser?.window?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
     @objc private func quitAction() {
         guard confirmDiscard() else { return }
         NSApp.terminate(nil)
@@ -371,6 +381,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 hideSearch()
                 onboardingPanel?.orderOut(nil)
                 editorPanel?.orderOut(nil)
+                engineBrowser?.window?.orderOut(nil)
                 // Give WindowServer a frame to remove the panels before the system picker.
                 try? await Task.sleep(nanoseconds: 180_000_000)
                 guard let url = try await NativeServices.capture() else { capturing = false; return }
