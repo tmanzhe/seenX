@@ -11,7 +11,7 @@ The hosted website is a separate static preview. It never becomes the user's loc
 | Layer | Exists today | Planned work |
 | --- | --- | --- |
 | Website | Next.js/React/TypeScript, sample capture, authored text boxes, spatial annotations, localStorage, JSON export | Maintain truthful product/docs copy and demo behavior |
-| Python prototype | Image/PDF reading, Vision OCR strings/boxes, folder text/visual retrieval, caching, diagnostics, versioned memory catalog, OCR quotes, and FTS5 evidence search | Word/range selection, richer relationships/collections, catalog visual fusion, semantic note retrieval, shared local contract, portable export |
+| Python prototype | Image/PDF reading, Vision OCR strings/boxes, folder text/visual retrieval, caching, diagnostics, versioned memory catalog, OCR quotes, FTS5 evidence search, and versioned local read-only search/fetch contract | Native client integration, write/export contract, access grants, word/range selection, richer relationships/collections, catalog visual fusion, semantic note retrieval, portable export |
 | Native Mac app | Initial SwiftUI/AppKit menu-bar app: translucent search, global shortcuts, system region capture, Vision text highlights, notes, separate local development library | Shared-engine integration, ScreenCaptureKit adapter, source permissions, production distribution |
 | Assistant bridge | Website illustration and export only | Opt-in, bounded read-only MCP retrieval; client integration/evaluation |
 
@@ -21,12 +21,14 @@ The hosted website is a separate static preview. It never becomes the user's loc
 - **FTS5 provides lexical phrase/term retrieval:** OCR, selected text, and human notes. Tokenization normalizes punctuation and isn't byte-exact identifier comparison; preserve identifier fixtures in evaluation.
 - **Local embeddings provide semantic retrieval:** image/text encoders find visual similarity; a separately evaluated text encoder can retrieve note paraphrases.
 - **Vector search can remain embedded:** evaluate sqlite-vec against exact scanning. SQLite and vector retrieval are complementary, not alternative product directions. No vector extension is installed in the production core today.
-- **Python is the development reference:** existing code proves behavior before a port. A bounded local service can connect prototype clients; FastAPI is a candidate, not an existing server.
+- **Python is the development reference:** existing code proves behavior before a port. The initial `seenx-engine` contract uses JSON lines over local process pipes for search and evidence fetch. FastAPI isn't an installed dependency or an existing server; a future HTTP transport would need a demonstrated reason.
 - **SwiftUI/AppKit own native interaction:** capture, hotkeys, floating panels, platform permissions, OCR adapters, and annotations.
 - **Native engine integration follows measured behavior:** connect the Swift app to proven catalog and retrieval operations behind stable contracts, using the Python implementation as the evaluation reference.
 - **MCP is the assistant interface:** first-release scope, not a second independent search system or an autonomous agent framework.
 
 ## Intended data flow
+
+The initial [local engine contract](../python/docs/engine-contract.md) implements bounded read-only search, memory fetch, and saved-region fetch with optional orientation-corrected PNG attachments. It wraps the existing catalog instead of introducing another search implementation. The trusted launcher selects one whole library; this is not yet a source/collection authorization boundary. Native wiring, write operations, portable exports, cancellation, and the MCP adapter remain planned.
 
 ```text
 SeenX capture or selected-source import

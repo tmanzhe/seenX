@@ -13,7 +13,7 @@ This plan supersedes the earlier sequence that put a broad ontology experiment b
 - **Website:** working authored sample capture, image results, text selection, pins/regions, notes, browser persistence, Command/Ctrl K, and JSON context export. No real image access, OCR, vector inference, or assistant connection.
 - **Python:** image/PDF reading, macOS Vision OCR strings/boxes, folder text/visual/hybrid search, caching, diagnostics, and a durable memory catalog. `seenx-memory` supports import, notes/regions, OCR quotes, revision-aware fetch, FTS5 retrieval over saved notes/selections/OCR, transactional edit/remove, and index rebuild. Version-1/2 catalogs migrate atomically to version 3 while preserving source IDs.
 - **Native app:** initial SwiftUI/AppKit menu-bar frontend with translucent search, global shortcuts, system region screenshots, Vision text-box highlights, notes, and its own local development library. It does not yet use the Python catalog or retrieval engine. See [native setup and shortcuts](apps/macos/README.md).
-- **Shared API/MCP:** not implemented. Integrate the Swift frontend with measured retrieval behavior behind a shared contract.
+- **Shared interface:** version-1 local read-only search, memory fetch, and saved-region fetch through `seenx-engine` JSON process pipes. It returns stable evidence IDs, explicit errors, trace IDs, and optional image/crop attachments. Native integration, write/export operations, access grants, and MCP remain unfinished.
 - **Word/range selection, semantic note embeddings, sqlite-vec, catalog visual/text fusion, and shared native/Python retrieval:** not implemented. Initial lexical catalog retrieval is available through the CLI.
 
 ## 01 — Durable local memory + lightweight ontology · IN PROGRESS
@@ -49,10 +49,12 @@ Catalog FTS5 search is now implemented for notes, selected text, and OCR evidenc
 
 ## 03 — Shared local engine contract · V1
 
+The read-only slice is implemented: a persistent local process accepts bounded JSON-line requests for capability discovery, catalog search, memory fetch, and saved-region fetch. It checks revision ownership, preserves provenance/coordinate context, omits internal paths, and bounds image attachments. Tests cover invalid input, recovery, limits, and log-content omission; a separate process check decoded a real existing image and crop. See [the engine lesson](python/docs/engine-contract.md). This doesn't finish this milestone: write/export operations, grants, cancellation, and native/MCP integration remain below.
+
 Define operations for import, annotate, search, fetch memory, fetch region, export, and remove. Return stable IDs, model/index revisions, evidence provenance, coordinates, and explicit errors.
 
 - Use the Python implementation as the initial behavior reference.
-- A small local service, with FastAPI as a prototype candidate, may connect the first native/MCP clients. It is not the public website backend.
+- The initial transport is local subprocess pipes, without an HTTP server. Connect the native client first; add an MCP adapter with explicit grants. Add another transport only if the integration requires it.
 - One owner coordinates database writes and indexing jobs. Provide cancellation, retries, bounded requests, and predictable state changes.
 - Enforce selected-source and collection access in the engine; callers cannot bypass authorization by requesting another record ID.
 - Keep image/note contents out of diagnostic logs by default. Treat retrieved text as data, not executable instructions.
@@ -113,6 +115,6 @@ Continuous multi-device sync, concurrent-note conflict handling, PDFs and bookma
 
 ## Immediate next step
 
-Define and evaluate the shared local search/fetch contract using the existing catalog retrieval, including stable evidence IDs, filters, errors, and labeled queries. Connect the native frontend to that shared engine rather than creating another catalog/search implementation. Measure lexical and visual behavior before choosing catalog fusion or semantic note embeddings. Keep source/collection grants explicit before exposing MCP access.
+Connect a native search/fetch client to the version-1 local engine contract. Choose an explicit import path for the separate native development library before adding write operations; preserve unsaved native drafts on helper failure. Evaluate retrieval with labeled queries, and measure lexical and visual behavior before choosing catalog fusion or semantic note embeddings. Add source/collection grants before exposing MCP access.
 
 See [architecture](docs/architecture.md), [the Python walkthrough](python/README.md), and [the public website roadmap](https://seenx-lovat.vercel.app/docs/roadmap).

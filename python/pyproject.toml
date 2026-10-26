@@ -18,6 +18,7 @@ seenx-inspect = "seenx.load_images:main"
 seenx-visual = "seenx.visual_search:main"
 seenx-search = "seenx.search_files:main"
 seenx-memory = "seenx.memory_cli:main"
+seenx-engine = "seenx.engine_stdio:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
