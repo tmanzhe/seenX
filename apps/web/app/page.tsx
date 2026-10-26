@@ -13,12 +13,12 @@ export default function Home() {
       <div className="hero-copy">
         <h1>Save what matters.<br />Remember <em>why.</em></h1>
         <p className="hero-description">Screenshots, ideas, and the thoughts that make them yours.<br className="hero-desktop-break" /> Find your way back—in your own words.</p>
-        <div className="hero-actions"><a href="#demo" className="button button-orange">Try the interactive preview <Icon name="arrow" size={17} /></a><Link href="/docs" className="text-link">About seenX <Icon name="diagonal" size={15} /></Link></div>
+        <div className="hero-actions"><a href="#demo" className="button button-orange">Try the hands-on demo <Icon name="arrow" size={17} /></a><Link href="/docs" className="text-link">About seenX <Icon name="diagonal" size={15} /></Link></div>
       </div>
       <div className="premium-scene-wrap"><HeroMemoryScene /></div>
     </section>
 
-    <section className="demo-section" id="how-it-works" aria-labelledby="demo-heading"><div className="demo-intro"><h2 id="demo-heading">Try it for yourself.</h2></div><SearchDemo /></section>
+    <section className="demo-section" aria-labelledby="demo-heading"><div className="demo-intro"><h2 id="demo-heading">Try the hands-on demo.</h2></div><SearchDemo /></section>
 
     <section className="assistant-section section-container" id="assistant-bridge" aria-labelledby="assistant-heading"><div className="assistant-copy"><h2 id="assistant-heading">Your context,<br /><em>where you work.</em></h2><p>Bring selected images, highlights, and notes into your assistant’s next task.</p><Link href="/docs/agents" className="text-link">Explore the assistant bridge <Icon name="arrow" size={15} /></Link></div><div className="assistant-concept"><div className="assistant-concept-top"><span className="brand-symbol" aria-hidden="true"><i /><i /><i /><i /></span><span>seenX × your assistant</span><span className="concept-badge">Connection concept</span></div><div className="assistant-prompt">Pull my screenshots tagged “checkout flow” and build a prototype matching my notes.</div><div className="assistant-tool"><Icon name="search" size={14} /><span>Search selected memories</span><Icon name="lock" size={13} /></div><div className="assistant-memory"><div className="assistant-memory-art"><Icon name="image" size={26} /></div><div><strong>A checkout worth remembering</strong><span>“Keep the spacing. Try a softer palette.”</span><small>Image + your note + source</small></div></div></div></section>
 

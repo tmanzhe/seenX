@@ -156,7 +156,7 @@
 }
 
 @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
-  .premium-scene-wrap [role="tabpanel"] { transform: perspective(1800px) rotateX(calc(var(--scene-pointer-y, 0) * -1.2deg)) rotateY(calc(var(--scene-pointer-x, 0) * 1.4deg)); transition: transform .5s cubic-bezier(.22,1,.36,1); }
+  .premium-scene-wrap [data-memory-stage] { transform: perspective(1800px) rotateX(calc(var(--scene-pointer-y, 0) * -1.2deg)) rotateY(calc(var(--scene-pointer-x, 0) * 1.4deg)); transition: transform .5s cubic-bezier(.22,1,.36,1); }
   .portability-section:hover .portability-route > svg { animation: travel-arrow .9s ease-in-out infinite; }
   @keyframes travel-arrow { 0%, 100% { translate: -2px 0; opacity: .45; } 50% { translate: 3px 0; opacity: 1; } }
 }

@@ -1,19 +1,35 @@
+.scrollStory { position: relative; height: 220svh; min-height: 1050px; scroll-margin-top: 96px; --story-progress: 0; }
+.stickyScene { position: sticky; top: 96px; }
+.storyHeader { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 0 7%; font-size: 11px; color: var(--muted); }
+.storyHeader > span, .storyHeader > a { display: flex; align-items: center; gap: 7px; }
+.storyHeader > span > svg { rotate: 90deg; }
+.storyHeader > a { color: var(--muted); text-decoration: none; transition: color .2s; }
+.storyHeader > a:hover { color: var(--brand); }
+.storyHeader > a:focus-visible { outline: 2px solid var(--brand); outline-offset: 5px; border-radius: 3px; }
+.progressTrack { height: 2px; margin: 0 7%; background: var(--line); overflow: hidden; border-radius: 2px; }
+.progressTrack > span { display: block; height: 100%; background: var(--brand); transform: scaleX(var(--story-progress)); transform-origin: left; }
+.progressSteps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin: 15px 7% 0; padding: 0; list-style: none; }
+.progressSteps > li { opacity: .5; transition: opacity .35s; }
+.progressSteps > li[data-active="true"], .progressSteps > li[data-complete="true"] { opacity: 1; }
+.progressName { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 550; color: var(--muted); }
+.progressSteps > li[data-active="true"] .progressName { color: var(--brand); }
+.progressSteps p { margin: 7px 0 0; font-size: 11px; line-height: 1.55; color: var(--muted); }
+.scrollCue { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 18px 0 0; font-size: 10px; color: var(--muted); }
+.scrollCue > svg { rotate: 90deg; }
 .scene {
   text-align: left;
   width: 100%;
-  max-width: 1120px;
+  max-width: min(1120px, calc((100svh - 245px) * 1.75));
   margin: 0 auto;
   isolation: isolate;
   --scene-blue: #4189e6;
   --scene-shadow: 0 32px 85px -36px rgb(35 76 129 / .28), 0 7px 22px -13px rgb(35 76 129 / .15);
 }
 
-.stage { position: relative; aspect-ratio: 1.75; min-height: 420px; perspective: 1600px; }
+.stage { position: relative; aspect-ratio: 1.75; min-height: 0; perspective: 1600px; }
 .halo { position: absolute; z-index: -2; inset: 3% -5% -9%; border-radius: 50%; background: radial-gradient(ellipse at 54% 48%, color-mix(in srgb, var(--brand) 16%, transparent), transparent 66%); pointer-events: none; }
 .orbit { position: absolute; z-index: -1; width: 86%; height: 76%; left: 7%; top: 11%; border: 1px solid color-mix(in srgb, var(--brand) 12%, transparent); border-radius: 50%; transform: rotate(-13deg); pointer-events: none; }
 .orbit::after { position: absolute; content: ""; inset: 14px -24px; border: 1px solid color-mix(in srgb, var(--brand) 6%, transparent); border-radius: inherit; }
-.previewLabel { position: absolute; top: 1%; left: 11%; display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 10px; letter-spacing: .02em; }
-.previewLabel > span { width: 5px; height: 5px; background: var(--brand); border-radius: 50%; box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand) 9%, transparent); }
 
 .browser { position: absolute; top: 8%; left: 10%; width: 61%; border: 1px solid color-mix(in srgb, var(--line) 85%, white); border-radius: 17px; background: var(--glass); box-shadow: var(--scene-shadow); transform: rotateY(-4deg) rotateX(2deg) rotateZ(-2deg); transition: transform .65s cubic-bezier(.22,1,.36,1), opacity .5s; }
 .browserBar { display: flex; align-items: center; gap: 20px; height: 37px; padding: 0 13px; border-bottom: 1px solid var(--line); border-radius: 16px 16px 0 0; background: var(--glass); color: var(--muted); backdrop-filter: blur(16px); }
@@ -52,7 +68,7 @@
 .capturePill { position: absolute; z-index: 4; top: 58%; left: 51%; width: 40%; display: flex; align-items: center; gap: 12px; padding: 15px; border: 1px solid var(--line); border-radius: 17px; color: var(--ink); background: var(--glass); backdrop-filter: blur(25px); box-shadow: var(--scene-shadow); opacity: 0; transform: translateY(10px) scale(.97); pointer-events: none; transition: opacity .35s, transform .55s cubic-bezier(.22,1,.36,1); }
 .captureIcon { display: grid; place-items: center; width: 37px; height: 37px; flex-shrink: 0; background: color-mix(in srgb, var(--brand) 9%, transparent); color: var(--brand); border-radius: 12px; }
 .capturePill strong { display: block; font-weight: 550; font-size: 12px; }.capturePill small { display: block; font-size: 9px; line-height: 1.6; margin-top: 4px; color: var(--muted); }
-.capturePill button { display: grid; place-items: center; margin-left: auto; flex-shrink: 0; width: 29px; height: 29px; border: 1px solid var(--line); background: var(--surface); color: var(--accent); border-radius: 9px; }
+.capturePlus { display: grid; place-items: center; margin-left: auto; flex-shrink: 0; width: 29px; height: 29px; border: 1px solid var(--line); background: var(--surface); color: var(--accent); border-radius: 9px; }
 
 .searchCard { position: absolute; z-index: 5; width: 54%; left: 32%; top: 55%; border: 1px solid color-mix(in srgb, var(--line) 85%, white); border-radius: 18px; background: color-mix(in srgb, var(--paper) 92%, transparent); backdrop-filter: blur(30px); box-shadow: var(--scene-shadow), 0 0 0 5px color-mix(in srgb, var(--brand) 5%, transparent); opacity: 0; transform: translateY(14px) scale(.97); transition: opacity .4s, transform .65s cubic-bezier(.22,1,.36,1); pointer-events: none; }
 .searchField { display: flex; align-items: center; gap: 12px; padding: 18px; color: var(--brand); border-bottom: 1px solid var(--line); }
@@ -65,11 +81,6 @@
 .searchResult small { display: flex; align-items: center; gap: 4px; margin-top: 7px; color: var(--brand); font-size: 8px; }
 .searchResult .resultArrow { margin-top: 0; color: var(--brand); }
 
-.controls { display: flex; flex-direction: column; align-items: center; gap: 13px; position: relative; margin-top: 9px; padding-bottom: 5px; }
-.tabs { display: flex; gap: 3px; padding: 5px; border: 1px solid var(--line); border-radius: 14px; background: var(--glass); backdrop-filter: blur(12px); box-shadow: 0 3px 10px -6px rgb(35 76 129 / .15); }
-.tabs > button { display: flex; align-items: center; gap: 7px; padding: 10px 18px; border: 1px solid transparent; border-radius: 9px; background: transparent; color: var(--muted); font-size: 11px; transition: background .2s, color .2s, box-shadow .2s, scale .2s; }
-.tabs > button[aria-selected="true"] { color: var(--accent); background: var(--paper); border-color: var(--line); box-shadow: 0 2px 5px rgb(35 76 129 / .06); }
-.tabs > button:hover { color: var(--brand); }.tabs > button:focus-visible, .capturePill button:focus-visible { outline: 2px solid var(--brand); outline-offset: 4px; }
 
 .scene[data-step="0"] .browser { transform: rotateY(-3deg) rotateX(1deg) rotateZ(-1deg) translateY(-3px); }
 .scene[data-step="0"] .captureCorners { opacity: 1; }
@@ -84,30 +95,84 @@
 
 @media (prefers-reduced-motion: no-preference) {
   .halo { animation: ambient 10s ease-in-out infinite alternate; }
-  .noteCard:hover { transform: rotate(1deg) translateY(-4px); }
-  .tabs > button:active, .capturePill button:active { scale: .96; }
-  @keyframes ambient { from { opacity: .65; transform: scale(.95) translate(-2%, 0); } to { opacity: 1; transform: scale(1.04) translate(2%, 2%); } }
+    @keyframes ambient { from { opacity: .65; transform: scale(.95) translate(-2%, 0); } to { opacity: 1; transform: scale(1.04) translate(2%, 2%); } }
 }
 @media (max-width: 850px) {
-  .stage { min-height: 380px; aspect-ratio: 1.6; }
+  .stage { min-height: 0; aspect-ratio: 1.6; }
   .browser { left: 5%; width: 65%; }
-  .previewLabel { left: 6%; }
-  .noteCard { left: 61%; width: 35%; top: 39%; padding: 14px 15px 12px; border-radius: 13px; }
+    .noteCard { left: 61%; width: 35%; top: 39%; padding: 14px 15px 12px; border-radius: 13px; }
   .noteCard p { font-size: 12px; margin: 12px 0; }.noteHeading { font-size: 9px; }.noteIcon { width: 23px; height: 23px; }.quote { font-size: 8px; padding: 7px; margin-top: 12px; }
   .searchCard { width: 62%; left: 29%; top: 56%; }.searchField { padding: 14px; }.searchField > span { font-size: 11px; }
   .capturePill { width: 46%; left: 48%; padding: 12px; gap: 9px; }
 }
 @media (max-width: 560px) {
-  .stage { aspect-ratio: auto; min-height: 0; height: clamp(460px, 130vw, 510px); margin-left: -9px; margin-right: -9px; }
-  .previewLabel { top: 0; left: 7%; font-size: 8px; }.browser { left: 4%; width: 88%; top: 8%; border-radius: 12px; }.browserBar { height: 29px; border-radius: 11px 11px 0 0; gap: 10px; padding: 0 10px; }.browserBar > span { font-size: 7px; }.windowDots { gap: 4px; }.windowDots i { width: 5px; height: 5px; }.screenshot { border-radius: 0 0 11px 11px; }
+  .stage { aspect-ratio: auto; min-height: 0; height: clamp(420px, 118vw, 480px); margin-left: -9px; margin-right: -9px; }
+  .browser { left: 4%; width: 88%; top: 8%; border-radius: 12px; }
+  .browserBar { height: 29px; border-radius: 11px 11px 0 0; gap: 10px; padding: 0 10px; }
+  .browserBar > span { font-size: 7px; }
+  .windowDots { gap: 4px; }
+  .windowDots i { width: 5px; height: 5px; }
+  .screenshot { border-radius: 0 0 11px 11px; }
   .noteCard { left: auto; right: 1%; top: 64%; width: 62%; padding: 12px 14px 10px; transform: rotate(3deg); border-radius: 12px; }.noteHeading { font-size: 9px; }.noteCard p { font-size: 12px; line-height: 1.65; margin: 10px 0 12px; }.noteFoot { padding-top: 8px; }.noteFoot > span { font-size: 7px; }.quote { font-size: 8px; margin-top: 10px; padding: 7px; }.noteIcon { width: 21px; height: 21px; }
   .cursor { left: 70%; }.cursor > svg { width: 17px; height: 22px; }.cursor > span { margin-top: 17px; font-size: 7px; }
   .capturePill { left: 12%; top: 65%; width: 83%; padding: 12px; }.capturePill strong { font-size: 11px; }.capturePill small { font-size: 8px; }.captureIcon { width: 32px; height: 32px; }
   .searchCard { width: 91%; left: 5%; top: 56%; border-radius: 13px; }.searchField { padding: 13px 12px; gap: 9px; }.searchField > span { font-size: 10px; }.searchField > svg { width: 16px; }.searchField > kbd { font-size: 8px; }.searchResult { gap: 9px; padding: 10px; }.resultImage { width: 62px; }.searchResult strong { font-size: 10px; }.searchResult span { font-size: 9px; }.searchResult small { font-size: 7px; }
   .scene[data-step="2"] .noteCard { transform: rotate(5deg) translate(0, -60px) scale(.88); opacity: .55; }.scene[data-step="2"] .browser { transform: rotateY(-3deg) rotateZ(-2deg) translate(-4px, -8px) scale(.94); }
-  .controls { margin-top: -7px; gap: 11px; }.tabs { padding: 4px; border-radius: 12px; }.tabs > button { font-size: 10px; padding: 9px 12px; gap: 5px; }.tabs > button > svg { width: 13px; }
 }
 @media (max-width: 370px) { .noteCard { width: 66%; }.noteCard p { font-size: 11px; }.searchField > span { font-size: 9px; }.searchField > kbd { display: none; } }
 @media (prefers-reduced-motion: reduce) {
   .scene *, .scene *::before, .scene *::after { animation: none !important; transition: none !important; }
+}
+
+@media (max-width: 850px) {
+  .scrollStory { scroll-margin-top: 76px; }
+  .stickyScene { top: 76px; }
+}
+@media (max-width: 560px) {
+  .scene { max-width: 100%; }
+  .storyHeader { padding: 0; font-size: 9px; gap: 8px; }
+  .storyHeader > a { gap: 3px; }
+  .progressSteps { gap: 12px; margin: 12px 0 0; }
+  .progressTrack { margin: 0; }
+  .progressName { font-size: 11px; gap: 5px; }
+  .progressSteps p { font-size: 9px; margin-top: 6px; }
+  .scrollCue { margin-top: 15px; font-size: 9px; }
+}
+@media (max-height: 650px) and (prefers-reduced-motion: no-preference) {
+  .scene { max-width: min(720px, calc((100svh - 170px) * 1.6)); }
+  .stage { height: auto; min-height: 0; aspect-ratio: 1.6; margin: 0; }
+  .storyHeader { font-size: 8px; padding: 0; }
+  .browser { left: 6%; top: 8%; width: 62%; }
+  .browserBar { height: 24px; gap: 8px; padding: 0 8px; }
+  .browserBar > span { font-size: 6px; }
+  .noteCard { left: 61%; right: auto; width: 35%; top: 34%; padding: 9px; border-radius: 10px; }
+  .noteHeading { font-size: 8px; gap: 4px; }
+  .noteIcon { width: 18px; height: 18px; }
+  .noteNumber, .quote, .noteFoot { display: none; }
+  .noteCard p { font-size: 8px; line-height: 1.4; margin: 5px 0 0; }
+  .capturePill { left: 49%; top: 54%; width: 49%; padding: 9px; gap: 6px; border-radius: 10px; }
+  .capturePill strong { font-size: 9px; }
+  .capturePill small { font-size: 7px; }
+  .captureIcon { width: 24px; height: 24px; border-radius: 7px; }
+  .capturePlus { display: none; }
+  .searchCard { width: 67%; left: 29%; top: 46%; }
+  .searchField { padding: 9px; gap: 6px; }
+  .searchField > span { font-size: 8px; }
+  .searchField > kbd { display: none; }
+  .searchResult { padding: 8px; gap: 6px; }
+  .resultImage { width: 38px; }
+  .searchResult strong { font-size: 8px; }
+  .searchResult span, .searchResult small { font-size: 7px; margin-top: 3px; }
+  .progressTrack { margin: 0; }
+  .progressSteps { margin: 9px 0 0; gap: 8px; }
+  .progressName { font-size: 9px; gap: 5px; }
+  .progressSteps p, .scrollCue { display: none; }
+  .scene[data-step="2"] .noteCard { transform: rotate(3deg) translate(0, -15px) scale(.9); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scrollStory { height: auto; min-height: 0; }
+  .stickyScene { position: relative; top: auto; }
+  .scene { max-width: 1120px; }
+  .progressSteps > li { opacity: 1; }
+  .progressTrack, .scrollCue, .storyHeader > span > svg { display: none; }
 }

@@ -35,7 +35,7 @@ export function LandingMotion() {
           observer.unobserve(entry.target);
         });
       }, { threshold: 0.08, rootMargin: "0px 0px -24px 0px" });
-      root.querySelectorAll(".hero-copy > *, .premium-scene-wrap, .demo-intro > *, .assistant-copy > *, .assistant-concept, .portability-copy > *, .portability-visual, .faq-section > div:first-child, .faq-list details").forEach((element) => observer.observe(element));
+      root.querySelectorAll(".hero-copy > *, .demo-intro > *, .assistant-copy > *, .assistant-concept, .portability-copy > *, .portability-visual, .faq-section > div:first-child, .faq-list details").forEach((element) => observer.observe(element));
 
       const hero = root.querySelector<HTMLElement>(".hero-editorial");
       const scene = root.querySelector<HTMLElement>(".premium-scene-wrap");
