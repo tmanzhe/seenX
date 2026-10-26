@@ -35,7 +35,7 @@ export function LandingMotion() {
           observer.unobserve(entry.target);
         });
       }, { threshold: 0.08, rootMargin: "0px 0px -24px 0px" });
-      const observe = () => root.querySelectorAll(".hero-copy > *, .demo-intro > *, .desktop-window, .section-intro > *, .memory-steps-grid article, .use-case-grid article, .assistant-copy > *, .assistant-concept, .local-copy > *, .portability-copy > *, .portability-visual, .folder-stack > div, .index-node, .device-boundary, .faq-section > div:first-child, .faq-list details, .memory-closing > *").forEach((element) => {
+      const observe = () => root.querySelectorAll(".hero-copy > *, .premium-scene-wrap, .demo-intro > *, .desktop-window, .section-intro > *, .memory-steps-grid article, .use-case-grid article, .assistant-copy > *, .assistant-concept, .local-copy > *, .portability-copy > *, .portability-visual, .folder-stack > div, .index-node, .device-boundary, .faq-section > div:first-child, .faq-list details, .memory-closing > *").forEach((element) => {
         if (!seen.has(element)) observer.observe(element);
       });
       observe();
@@ -47,6 +47,23 @@ export function LandingMotion() {
 
       const hero = root.querySelector<HTMLElement>(".hero-editorial");
       const diagram = root.querySelector<HTMLElement>(".local-visual");
+      const scene = root.querySelector<HTMLElement>(".premium-scene-wrap");
+      let pointerFrame = 0;
+      let pointer = { x: 0, y: 0 };
+      const applyPointer = () => {
+        pointerFrame = 0;
+        scene?.style.setProperty("--scene-pointer-x", String(pointer.x));
+        scene?.style.setProperty("--scene-pointer-y", String(pointer.y));
+      };
+      const movePointer = (event: PointerEvent) => {
+        if (event.pointerType !== "mouse" || !scene || !matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+        const bounds = scene.getBoundingClientRect();
+        pointer = { x: Math.max(-1, Math.min(1, (event.clientX - bounds.left) / bounds.width * 2 - 1)), y: Math.max(-1, Math.min(1, (event.clientY - bounds.top) / bounds.height * 2 - 1)) };
+        if (!pointerFrame) pointerFrame = requestAnimationFrame(applyPointer);
+      };
+      const resetPointer = () => { pointer = { x: 0, y: 0 }; if (!pointerFrame) pointerFrame = requestAnimationFrame(applyPointer); };
+      scene?.addEventListener("pointermove", movePointer);
+      scene?.addEventListener("pointerleave", resetPointer);
       let frame = 0;
       const update = () => {
         frame = 0;
@@ -75,6 +92,11 @@ export function LandingMotion() {
         resize.disconnect();
         animations.forEach((animation) => animation.cancel());
         cancelAnimationFrame(frame);
+        cancelAnimationFrame(pointerFrame);
+        scene?.removeEventListener("pointermove", movePointer);
+        scene?.removeEventListener("pointerleave", resetPointer);
+        scene?.style.removeProperty("--scene-pointer-x");
+        scene?.style.removeProperty("--scene-pointer-y");
         window.removeEventListener("scroll", requestUpdate);
         window.removeEventListener("resize", requestUpdate);
         delete root.dataset.motion;

@@ -4,6 +4,7 @@ import { SiteFrame } from "../components/site-frame";
 import { SoundProvider } from "../components/sound-controls";
 import { productDescription } from "../lib/product";
 import "./globals.css";
+import "./landing-polish.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://seenx-lovat.vercel.app"),
