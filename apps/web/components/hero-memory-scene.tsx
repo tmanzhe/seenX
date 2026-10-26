@@ -1,10 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { demoItems } from "../lib/demo";
 import { Icon } from "./icon";
 import { MemoryArtwork } from "./memory-artwork";
 import styles from "./hero-memory-scene.module.css";
+
+const orbitPaths = [
+  "M 950 320 C 950 475 748 600 500 600 C 252 600 50 475 50 320 C 50 165 252 40 500 40 C 748 40 950 165 950 320",
+  "M 925 320 C 925 450 735 555 500 555 C 265 555 75 450 75 320 C 75 190 265 85 500 85 C 735 85 925 190 925 320",
+  "M 970 320 C 970 495 760 620 500 620 C 240 620 30 495 30 320 C 30 145 240 20 500 20 C 760 20 970 145 970 320",
+];
 
 const steps = [
   { name: "Capture", description: "A little inspiration. Worth keeping.", icon: "monitor" },
@@ -22,6 +28,9 @@ export function HeroMemoryScene() {
     const root = host.current;
     const frame = sticky.current;
     if (!root || !frame) return;
+    const orbit = root.querySelector<SVGPathElement>("[data-orbit-path]");
+    const head = root.querySelector<SVGGElement>("[data-orbit-head]");
+    const length = orbit?.getTotalLength() ?? 0;
     const media = matchMedia("(prefers-reduced-motion: reduce)");
     let raf = 0;
     let previousStep = -1;
@@ -32,6 +41,11 @@ export function HeroMemoryScene() {
       const distance = Math.max(1, root.offsetHeight - frame.offsetHeight);
       const progress = reduced ? 1 : Math.min(1, Math.max(0, (inset - root.getBoundingClientRect().top) / distance));
       root.style.setProperty("--story-progress", String(progress));
+      root.style.setProperty("--orbit-rotation", `${-16 + progress * 22}deg`);
+      if (orbit && head) {
+        const point = orbit.getPointAtLength(length * progress);
+        head.setAttribute("transform", `translate(${point.x} ${point.y})`);
+      }
       const next = reduced ? 1 : progress < .28 ? 0 : progress < .68 ? 1 : 2;
       if (next !== previousStep) { previousStep = next; setStep(next); }
     };
@@ -58,7 +72,13 @@ export function HeroMemoryScene() {
         <div className={styles.storyHeader}><span>{staticView ? "How seenX works" : "Scroll to watch"}<Icon name="arrow" size={12} /></span><a href="#demo">Skip to the hands-on demo <Icon name="diagonal" size={12} /></a></div>
         <div className={styles.stage} data-memory-stage role="group" aria-label={steps[step].name + " walkthrough scene"}>
           <div className={styles.halo} aria-hidden="true" />
-          <div className={styles.orbit} aria-hidden="true" />
+          <svg className={styles.orbit} viewBox="0 0 1000 640" aria-hidden="true" focusable="false">
+            {orbitPaths.map((path, index) => <g key={path}>
+              <path className={styles.orbitGuide} d={path} />
+              <path className={styles.orbitInk} d={path} pathLength="1" data-orbit-path={index === 0 ? "" : undefined} style={{ "--trail-delay": index * .12 } as CSSProperties} />
+            </g>)}
+            <g className={styles.orbitHead} data-orbit-head transform="translate(950 320)"><circle r="12" /><circle r="4" /></g>
+          </svg>
 
           <div className={styles.browser}>
             <div className={styles.browserBar}>

@@ -2,10 +2,11 @@
 
 import { useEffect, useRef } from "react";
 
-const columns = 88;
-const rows = 40;
-const tones = " .,:;+=xX#@";
+const columns = 144;
+const rows = 56;
+const tones = " .,:;=+xX#@";
 type Vector = [number, number, number];
+type Pointer = { x: number; y: number };
 
 function rotate([x, y, z]: Vector, yaw: number, pitch: number): Vector {
   const a = x * Math.cos(yaw) + z * Math.sin(yaw);
@@ -13,108 +14,132 @@ function rotate([x, y, z]: Vector, yaw: number, pitch: number): Vector {
   return [a, y * Math.cos(pitch) - b * Math.sin(pitch), y * Math.sin(pitch) + b * Math.cos(pitch)];
 }
 
-// Four spinning cubes retain the logo's grid, against the original ripple field.
-function draw(time: number, pointer: { x: number; y: number }) {
-  const yaw = -.2 + Math.sin(time * .45) * .18 + pointer.x * .32;
-  const pitch = .16 + Math.sin(time * .35) * .12 + pointer.y * .22;
-  const inverse = (v: Vector) => {
-    const [x, y, z] = v;
-    const b = y * Math.cos(pitch) + z * Math.sin(pitch);
-    const c = -y * Math.sin(pitch) + z * Math.cos(pitch);
-    return [x * Math.cos(yaw) - c * Math.sin(yaw), b, x * Math.sin(yaw) + c * Math.cos(yaw)] as Vector;
-  };
-  const direction = inverse([0, 0, -1]);
-  const tiles = [[-6.3, -6.3], [6.3, -6.3], [-6.3, 6.3], [6.3, 6.3]];
-  const spin = time * .75 + .28;
-  const tumble = Math.sin(time * .6) * .35;
-  const unspin = ([x, y, z]: Vector): Vector => {
-    const b = y * Math.cos(tumble) + z * Math.sin(tumble);
-    const c = -y * Math.sin(tumble) + z * Math.cos(tumble);
-    return [x * Math.cos(spin) - c * Math.sin(spin), b, x * Math.sin(spin) + c * Math.cos(spin)];
-  };
-  const half = [4.15, 4.15, 4.15];
-  return Array.from({ length: rows }, (_, y) => Array.from({ length: columns }, (_, x) => {
-    const px = (x - columns / 2) / 2, py = y - rows / 2;
-    const origin = inverse([px, py, 50]);
-    let nearest = Infinity;
-    const radius = Math.hypot(px, py);
-    const wave = Math.sin(radius * .68 - time * 2.4) * .5 + .5;
-    let brightness = wave * Math.max(0, 1 - radius / 32) * .3;
-    for (let tile = 0; tile < tiles.length; tile++) {
-      const [cx, cy] = tiles[tile];
-      const angle = tile === 3 ? Math.PI / 12 : 0;
-      const cos = Math.cos(angle), sin = Math.sin(angle);
-      const ox = origin[0] - cx, oy = origin[1] - cy;
-      const local = unspin([ox * cos + oy * sin, -ox * sin + oy * cos, origin[2]]);
-      const ray = unspin([direction[0] * cos + direction[1] * sin, -direction[0] * sin + direction[1] * cos, direction[2]]);
-      let near = -Infinity, far = Infinity, face = 0, sign = 1;
-      for (let axis = 0; axis < 3; axis++) {
-        if (Math.abs(ray[axis]) < 1e-8) {
-          if (Math.abs(local[axis]) > half[axis]) { far = -Infinity; break; }
-          continue;
-        }
-        const a = (-half[axis] - local[axis]) / ray[axis];
-        const b = (half[axis] - local[axis]) / ray[axis];
-        const entry = Math.min(a, b);
-        if (entry > near) { near = entry; face = axis; sign = a < b ? -1 : 1; }
-        far = Math.min(far, Math.max(a, b));
-      }
-      if (near > far || near < 0 || near >= nearest) continue;
-      nearest = near;
-      const normal: Vector = [0, 0, 0];
-      normal[face] = sign;
-      const spun = rotate(normal, spin, tumble);
-      const world = rotate([spun[0] * cos - spun[1] * sin, spun[0] * sin + spun[1] * cos, spun[2]], yaw, pitch);
-      const light = Math.max(0, -world[0] * .35 - world[1] * .45 + world[2] * .82);
-      brightness = Math.min(1, .28 + light * .7);
+// Sample actual cube faces once; each frame projects them into a character grid.
+const surface: { point: Vector; normal: Vector; edge: boolean }[] = [];
+for (let axis = 0; axis < 3; axis++) {
+  for (const side of [-1, 1]) {
+    for (let u = 0; u <= 18; u++) for (let v = 0; v <= 18; v++) {
+      const point: Vector = [0, 0, 0], normal: Vector = [0, 0, 0];
+      point[axis] = side * 3.35; normal[axis] = side;
+      point[(axis + 1) % 3] = (u / 18 * 2 - 1) * 3.35;
+      point[(axis + 2) % 3] = (v / 18 * 2 - 1) * 3.35;
+      surface.push({ point, normal, edge: u === 0 || u === 18 || v === 0 || v === 18 });
     }
-    return tones[Math.floor(brightness * (tones.length - 1))];
-  }).join("")).join("\n");
+  }
 }
+
+function draw(time: number, pointer: Pointer, scroll = 0) {
+  const field: string[] = [], solid = Array<string>(columns * rows).fill(" ");
+  const depth = new Float32Array(columns * rows).fill(-Infinity);
+  const phase = time * .65 + scroll * 3;
+  // A travelling contour field, broken isometric grid, and quiet data points.
+  for (let y = 0; y < rows; y++) for (let x = 0; x < columns; x++) {
+    const px = (x - columns / 2) * .55, py = (y - rows / 2) * .95;
+    const contour = Math.sin(Math.hypot(px + 19, py * .8) * .72 - phase + Math.sin(px * .1 + phase * .3));
+    const gridA = Math.abs(((px + py * 1.5 + scroll * 5) % 12 + 12) % 12 - 6);
+    const gridB = Math.abs(((px - py * 1.5 - scroll * 5) % 12 + 12) % 12 - 6);
+    const hash = (x * 17 + y * 31) % 97;
+    let glyph = " ";
+    if (contour > .94) glyph = contour > .99 ? ":" : ".";
+    if ((gridA < .23 || gridB < .23) && hash % 3 === 0) glyph = "·";
+    if (hash === 0) glyph = Math.sin(phase + x * .2) > .65 ? "+" : ".";
+    if ((x + y * 7) % 173 === 0) glyph = "×";
+    field.push(glyph);
+  }
+  const yaw = -.3 + pointer.x * .2 + scroll * .2;
+  const pitch = -.12 + pointer.y * .16;
+  const spin = time * .48 + .45 + scroll * .85;
+  const tumble = Math.sin(time * .32) * .28 + .15;
+  const tiles = [[-5, -5], [5, -5], [-5, 5], [5, 5]];
+  tiles.forEach(([cx, cy], tile) => {
+    const angle = tile === 3 ? Math.PI / 12 : 0;
+    const cos = Math.cos(angle), sin = Math.sin(angle);
+    for (const sample of surface) {
+      const spun = rotate(sample.point, spin, tumble);
+      const local: Vector = [spun[0] * cos - spun[1] * sin + cx, spun[0] * sin + spun[1] * cos + cy, spun[2]];
+      const [rx, ry, rz] = rotate(local, yaw, pitch);
+      const normal = rotate(sample.normal, spin, tumble);
+      const facing = rotate([normal[0] * cos - normal[1] * sin, normal[0] * sin + normal[1] * cos, normal[2]], yaw, pitch);
+      if (facing[2] <= 0) continue;
+      const perspective = 65 / (65 - rz);
+      const x = Math.round((rx * perspective + 26 + pointer.x * .7) / .55 + columns / 2);
+      const y = Math.round((ry * perspective - 1 + Math.sin(time * .5) * .6) / .95 + rows / 2);
+      if (x < 0 || x >= columns || y < 0 || y >= rows) continue;
+      const index = y * columns + x;
+      if (rz < depth[index]) continue;
+      depth[index] = rz;
+      const light = Math.max(0, -facing[0] * .4 - facing[1] * .5 + facing[2] * .75);
+      solid[index] = sample.edge ? "+" : tones[Math.min(tones.length - 1, Math.floor((.22 + light * .75) * (tones.length - 1)))];
+    }
+  });
+  const lines = (grid: string[]) => Array.from({ length: rows }, (_, y) => grid.slice(y * columns, (y + 1) * columns).join("")).join("\n");
+  return { field: lines(field), solid: lines(solid) };
+}
+
+const initial = draw(0, { x: 0, y: 0 });
 
 export function AsciiMemory() {
   const host = useRef<HTMLDivElement>(null);
-  const output = useRef<HTMLPreElement>(null);
-  const pointer = useRef({ x: 0, y: 0 });
+  const field = useRef<HTMLPreElement>(null);
+  const solid = useRef<HTMLPreElement>(null);
   useEffect(() => {
+    const element = host.current;
+    if (!element) return;
     const media = matchMedia("(prefers-reduced-motion: reduce)");
-    let visible = false;
-    let animation = 0;
-    let previous = 0;
-    let elapsed = 0;
-    const eased = { x: 0, y: 0 };
+    let visible = false, animation = 0, previous = 0, elapsed = 0;
+    let targetScroll = 0, scroll = 0;
+    const pointer = { x: 0, y: 0 }, eased = { x: 0, y: 0 };
+    const render = () => {
+      const frame = draw(elapsed, eased, scroll);
+      if (field.current) field.current.textContent = frame.field;
+      if (solid.current) solid.current.textContent = frame.solid;
+    };
     const tick = (now: number) => {
       if (now - previous >= 32) {
         elapsed += previous ? Math.min((now - previous) / 1000, .1) : 0;
         previous = now;
-        eased.x += (pointer.current.x - eased.x) * .15;
-        eased.y += (pointer.current.y - eased.y) * .15;
-        if (output.current) output.current.textContent = draw(elapsed, eased);
+        eased.x += (pointer.x - eased.x) * .12;
+        eased.y += (pointer.y - eased.y) * .12;
+        scroll += (targetScroll - scroll) * .16;
+        render();
       }
       animation = requestAnimationFrame(tick);
     };
     const update = () => {
-      cancelAnimationFrame(animation);
-      previous = 0;
+      cancelAnimationFrame(animation); previous = 0;
       if (visible && !media.matches && !document.hidden) animation = requestAnimationFrame(tick);
-      else if (media.matches && output.current) output.current.textContent = draw(0, { x: 0, y: 0 });
+      else if (media.matches) {
+        elapsed = 0; scroll = 0; eased.x = 0; eased.y = 0; render();
+      }
     };
     const observer = new IntersectionObserver(entries => { visible = entries[0].isIntersecting; update(); });
-    if (host.current) observer.observe(host.current);
-    media.addEventListener("change", update);
-    document.addEventListener("visibilitychange", update);
-    const hero = host.current?.closest(".hero-editorial");
+    observer.observe(element);
+    const hero = element.closest(".hero-editorial");
     const move = (event: Event) => {
       if (media.matches || !(event instanceof PointerEvent) || event.pointerType !== "mouse" || !hero) return;
       const bounds = hero.getBoundingClientRect();
-      pointer.current = { x: (event.clientX - bounds.left) / bounds.width * 2 - 1, y: (event.clientY - bounds.top) / bounds.height * 2 - 1 };
+      pointer.x = Math.max(-1, Math.min(1, (event.clientX - bounds.left) / bounds.width * 2 - 1));
+      pointer.y = Math.max(-1, Math.min(1, event.clientY / innerHeight * 2 - 1));
     };
-    const reset = () => { pointer.current = { x: 0, y: 0 }; };
+    const reset = () => { pointer.x = 0; pointer.y = 0; };
+    const onScroll = () => { targetScroll = Math.min(1, Math.max(0, -element.getBoundingClientRect().top / Math.max(1, element.clientHeight))); };
+    onScroll();
+    media.addEventListener("change", update);
+    document.addEventListener("visibilitychange", update);
+    window.addEventListener("scroll", onScroll, { passive: true });
     hero?.addEventListener("pointermove", move);
     hero?.addEventListener("pointerleave", reset);
-    return () => { cancelAnimationFrame(animation); observer.disconnect(); media.removeEventListener("change", update); document.removeEventListener("visibilitychange", update); hero?.removeEventListener("pointermove", move); hero?.removeEventListener("pointerleave", reset); };
+    return () => {
+      cancelAnimationFrame(animation); observer.disconnect();
+      media.removeEventListener("change", update);
+      document.removeEventListener("visibilitychange", update);
+      window.removeEventListener("scroll", onScroll);
+      hero?.removeEventListener("pointermove", move);
+      hero?.removeEventListener("pointerleave", reset);
+    };
   }, []);
-  return <div className="ascii-memory" ref={host}>
-    <pre ref={output} aria-hidden="true">{draw(0, { x: 0, y: 0 })}</pre>
+  return <div className="ascii-memory" ref={host} aria-hidden="true">
+    <pre className="ascii-field" ref={field}>{initial.field}</pre>
+    <pre className="ascii-form" ref={solid}>{initial.solid}</pre>
   </div>;
 }

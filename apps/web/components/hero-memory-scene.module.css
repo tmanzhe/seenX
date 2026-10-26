@@ -28,8 +28,13 @@
 
 .stage { position: relative; aspect-ratio: 1.75; min-height: 0; perspective: 1600px; }
 .halo { position: absolute; z-index: -2; inset: 3% -5% -9%; border-radius: 50%; background: radial-gradient(ellipse at 54% 48%, color-mix(in srgb, var(--brand) 16%, transparent), transparent 66%); pointer-events: none; }
-.orbit { position: absolute; z-index: -1; width: 86%; height: 76%; left: 7%; top: 11%; border: 1px solid color-mix(in srgb, var(--brand) 12%, transparent); border-radius: 50%; transform: rotate(-13deg); pointer-events: none; }
-.orbit::after { position: absolute; content: ""; inset: 14px -24px; border: 1px solid color-mix(in srgb, var(--brand) 6%, transparent); border-radius: inherit; }
+.orbit { position: absolute; z-index: -1; width: 106%; height: 108%; left: -3%; top: -4%; overflow: visible; transform: rotate(var(--orbit-rotation, -16deg)); pointer-events: none; }
+.orbit path { fill: none; }
+.orbitGuide { stroke: var(--brand); stroke-opacity: .1; stroke-width: .8; }
+.orbitInk { stroke: var(--brand); stroke-opacity: .42; stroke-width: 1.2; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: calc(1 - clamp(0, (var(--story-progress) - var(--trail-delay)) / (1 - var(--trail-delay)), 1)); }
+.orbitHead { opacity: clamp(0, var(--story-progress) * 12, 1); }
+.orbitHead circle:first-child { fill: var(--brand); opacity: .1; }
+.orbitHead circle:last-child { fill: var(--brand); stroke: var(--paper); stroke-width: 2; }
 
 .browser { position: absolute; top: 8%; left: 10%; width: 61%; border: 1px solid color-mix(in srgb, var(--line) 85%, white); border-radius: 17px; background: var(--glass); box-shadow: var(--scene-shadow); transform: rotateY(-4deg) rotateX(2deg) rotateZ(-2deg); transition: transform .65s cubic-bezier(.22,1,.36,1), opacity .5s; }
 .browserBar { display: flex; align-items: center; gap: 20px; height: 37px; padding: 0 13px; border-bottom: 1px solid var(--line); border-radius: 16px 16px 0 0; background: var(--glass); color: var(--muted); backdrop-filter: blur(16px); }
@@ -175,4 +180,15 @@
   .scene { max-width: 1120px; }
   .progressSteps > li { opacity: 1; }
   .progressTrack, .scrollCue, .storyHeader > span > svg { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .orbit { transform: rotate(-12deg); }
+  .orbitInk { stroke-dashoffset: 0; stroke-opacity: .14; }
+  .orbitHead { display: none; }
+}
+
+@media (max-width: 560px) {
+  .orbitGuide { stroke-width: 1.5; }
+  .orbitInk { stroke-width: 2.2; }
 }
