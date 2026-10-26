@@ -5,7 +5,7 @@ A Next.js App Router website for a local visual memory: saved images, the though
 ## Current behavior
 
 - Responsive sky-blue glass styling, with a dark theme and reduced-motion support.
-- Scroll-driven Capture / Annotate / Recall walkthrough with a direct skip to the hands-on capture demo. Native scrolling, reversible stages, and a compact static guide for reduced motion.
+- Spacious opening with the headline and two actions, with the demo bar peeking above the fold, followed by a scroll-driven Capture / Annotate / Recall walkthrough. Native scrolling, reversible stages, and a compact static guide for reduced motion.
 - Scroll-drawn orbital trails and a layered ASCII contour field with shaded 3D logo cubes; decorative motion pauses offscreen and respects reduced motion.
 - Capture/save acknowledgements, responsive hover feedback, and small motion effects that respect reduced-motion preferences.
 - A normal search bar with image results, plus a pretend screenshot → highlight → save → Command/Ctrl K search flow.

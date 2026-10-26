@@ -69,7 +69,6 @@ export function HeroMemoryScene() {
   return <div ref={host} id="how-it-works" className={styles.scrollStory} data-walkthrough data-step={step} data-static={staticView}>
     <div ref={sticky} className={styles.stickyScene}>
       <div className={styles.scene} data-step={step}>
-        <div className={styles.storyHeader}><span>{staticView ? "How seenX works" : "Scroll to watch"}<Icon name="arrow" size={12} /></span><a href="#demo">Skip to the hands-on demo <Icon name="diagonal" size={12} /></a></div>
         <div className={styles.stage} data-memory-stage role="group" aria-label={steps[step].name + " walkthrough scene"}>
           <div className={styles.halo} aria-hidden="true" />
           <svg className={styles.orbit} viewBox="0 0 1000 640" aria-hidden="true" focusable="false">

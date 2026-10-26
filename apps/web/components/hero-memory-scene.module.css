@@ -1,11 +1,5 @@
 .scrollStory { position: relative; height: 220svh; min-height: 1050px; scroll-margin-top: 96px; --story-progress: 0; }
 .stickyScene { position: sticky; top: 96px; }
-.storyHeader { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 0 7%; font-size: 11px; color: var(--muted); }
-.storyHeader > span, .storyHeader > a { display: flex; align-items: center; gap: 7px; }
-.storyHeader > span > svg { rotate: 90deg; }
-.storyHeader > a { color: var(--muted); text-decoration: none; transition: color .2s; }
-.storyHeader > a:hover { color: var(--brand); }
-.storyHeader > a:focus-visible { outline: 2px solid var(--brand); outline-offset: 5px; border-radius: 3px; }
 .progressTrack { height: 2px; margin: 0 7%; background: var(--line); overflow: hidden; border-radius: 2px; }
 .progressTrack > span { display: block; height: 100%; background: var(--brand); transform: scaleX(var(--story-progress)); transform-origin: left; }
 .progressSteps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin: 15px 7% 0; padding: 0; list-style: none; }
@@ -135,8 +129,6 @@
 }
 @media (max-width: 560px) {
   .scene { max-width: 100%; }
-  .storyHeader { padding: 0; font-size: 9px; gap: 8px; }
-  .storyHeader > a { gap: 3px; }
   .progressSteps { gap: 12px; margin: 12px 0 0; }
   .progressTrack { margin: 0; }
   .progressName { font-size: 11px; gap: 5px; }
@@ -146,7 +138,6 @@
 @media (max-height: 650px) and (prefers-reduced-motion: no-preference) {
   .scene { max-width: min(720px, calc((100svh - 170px) * 1.6)); }
   .stage { height: auto; min-height: 0; aspect-ratio: 1.6; margin: 0; }
-  .storyHeader { font-size: 8px; padding: 0; }
   .browser { left: 6%; top: 8%; width: 62%; }
   .browserBar { height: 24px; gap: 8px; padding: 0 8px; }
   .browserBar > span { font-size: 6px; }
@@ -179,7 +170,7 @@
   .stickyScene { position: relative; top: auto; }
   .scene { max-width: 1120px; }
   .progressSteps > li { opacity: 1; }
-  .progressTrack, .scrollCue, .storyHeader > span > svg { display: none; }
+  .progressTrack, .scrollCue { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
