@@ -193,6 +193,7 @@ class MigrationTests(unittest.TestCase):
             self.assertEqual(memory["annotations"][0]["selected_text_origin"], "user")
             self.assertEqual(memory["annotations"][0]["created_at"], "old-time")
             self.assertEqual(memory["ocr_runs"], [])
+            self.assertEqual(catalog.search("legacy note")[0]["annotation_id"], "note")
         with Catalog(self.root) as catalog:
             self.assertEqual(len(catalog.get_memory("asset")["annotations"]), 1)
 

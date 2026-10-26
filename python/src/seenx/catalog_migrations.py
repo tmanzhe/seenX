@@ -2,6 +2,7 @@
 
 import sqlite3
 
+from seenx.catalog_search_schema import V3_STATEMENTS
 
 V2_STATEMENTS = (
     """CREATE TABLE ocr_runs (
@@ -50,15 +51,21 @@ V2_STATEMENTS = (
 )
 
 
-def migrate_v1_to_v2(connection: sqlite3.Connection) -> None:
-    with connection:
-        connection.execute("BEGIN IMMEDIATE")
-        # Recheck after locking in case another local process already migrated.
-        version = connection.execute("PRAGMA user_version").fetchone()[0]
-        if version == 2:
-            return
-        if version != 1:
-            raise ValueError("Cannot apply the version-2 migration to this catalog")
-        for statement in V2_STATEMENTS:
-            connection.execute(statement)
-        connection.execute("PRAGMA user_version = 2")
+def migrate_catalog(connection: sqlite3.Connection) -> None:
+    try:
+        with connection:
+            connection.execute("BEGIN IMMEDIATE")
+            # Recheck under the write lock; all pending upgrades commit together.
+            version = connection.execute("PRAGMA user_version").fetchone()[0]
+            if version not in (1, 2, 3):
+                raise ValueError("Unsupported catalog schema")
+            for target, statements in ((2, V2_STATEMENTS), (3, V3_STATEMENTS)):
+                if version < target:
+                    for statement in statements:
+                        connection.execute(statement)
+                    connection.execute(f"PRAGMA user_version = {target}")
+                    version = target
+    except sqlite3.OperationalError as error:
+        if "no such module: fts5" in str(error).lower():
+            raise RuntimeError("This Python SQLite build needs FTS5; use the project's uv-managed Python") from error
+        raise

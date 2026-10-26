@@ -11,10 +11,10 @@ This plan supersedes the earlier sequence that put a broad ontology experiment b
 ## Current implementation
 
 - **Website:** working authored sample capture, image results, text selection, pins/regions, notes, browser persistence, Command/Ctrl K, and JSON context export. No real image access, OCR, vector inference, or assistant connection.
-- **Python:** image/PDF reading, macOS Vision OCR strings and persisted text-region boxes, literal text search, CLIP visual vectors, hybrid rank fusion, optional SQLite extraction/vector cache, diagnostics, and tests. The durable catalog supports image import, immutable snapshots/revisions, whole-image/point/region notes, quoted OCR observations, revision-aware fetch, and transactional edit/remove through `seenx-memory`. Version-1 catalogs migrate atomically to version 2.
+- **Python:** image/PDF reading, macOS Vision OCR strings/boxes, folder text/visual/hybrid search, caching, diagnostics, and a durable memory catalog. `seenx-memory` supports import, notes/regions, OCR quotes, revision-aware fetch, FTS5 retrieval over saved notes/selections/OCR, transactional edit/remove, and index rebuild. Version-1/2 catalogs migrate atomically to version 3 while preserving source IDs.
 - **Native app:** initial SwiftUI/AppKit menu-bar frontend with translucent search, global shortcuts, system region screenshots, Vision text-box highlights, notes, and its own local development library. It does not yet use the Python catalog or retrieval engine. See [native setup and shortcuts](apps/macos/README.md).
 - **Shared API/MCP:** not implemented. Integrate the Swift frontend with measured retrieval behavior behind a shared contract.
-- **FTS5, word/range selection, semantic note embeddings, sqlite-vec, and catalog-note search integration:** not implemented.
+- **Word/range selection, semantic note embeddings, sqlite-vec, catalog visual/text fusion, and shared native/Python retrieval:** not implemented. Initial lexical catalog retrieval is available through the CLI.
 
 ## 01 — Durable local memory + lightweight ontology · IN PROGRESS
 
@@ -33,7 +33,9 @@ The image/revision/region/annotation schema and local CLI are implemented. Separ
 
 ## 02 — Real OCR and hybrid retrieval · V1
 
-The initial OCR-region persistence and quote-selection slice is implemented and was exercised with real Vision output. It preserves line/region boxes and marks transcription as unverified; it doesn't yet provide word/range selection or catalog search.
+The OCR-region persistence and quote-selection slice is implemented and was exercised with real Vision output. It preserves line/region boxes and marks transcription as unverified. Word/range selection remains planned; catalog retrieval is described below.
+
+Catalog FTS5 search is now implemented for notes, selected text, and OCR evidence. Database triggers maintain the derived index transactionally across supported writes/deletion; a version-3 migration backfills existing records. Results return stable source IDs, revision/target data, excerpts, and provenance. Phrase/all-term modes, revision filters, bounded requests, and index rebuild are covered by tests. This is lexical retrieval, not semantic note search or a measured accuracy claim. See [the search lesson](python/docs/catalog-search.md).
 
 - Extend Vision OCR to retain text observations and word/range locations, not just a combined string.
 - Normalize Vision coordinates, EXIF orientation, screen points, and image pixels into the shared image coordinate system.
@@ -111,6 +113,6 @@ Continuous multi-device sync, concurrent-note conflict handling, PDFs and bookma
 
 ## Immediate next step
 
-Add FTS5 catalog retrieval over notes, user-selected text, and saved OCR observations, returning stable memory/revision/annotation/observation IDs and method evidence. Test edits and deletion propagation and compare results on labeled queries. The persistence and OCR-region quote loops are implemented; build on those contracts before adding a service or native/MCP clients.
+Define and evaluate the shared local search/fetch contract using the existing catalog retrieval, including stable evidence IDs, filters, errors, and labeled queries. Connect the native frontend to that shared engine rather than creating another catalog/search implementation. Measure lexical and visual behavior before choosing catalog fusion or semantic note embeddings. Keep source/collection grants explicit before exposing MCP access.
 
 See [architecture](docs/architecture.md), [the Python walkthrough](python/README.md), and [the public website roadmap](https://seenx-lovat.vercel.app/docs/roadmap).

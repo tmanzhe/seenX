@@ -22,6 +22,14 @@ def main() -> None:
     importer = commands.add_parser("import", help="Preserve an image revision; leave its source untouched")
     importer.add_argument("file", type=Path)
     commands.add_parser("list", help="List saved assets and annotation counts")
+    search = commands.add_parser("search", help="Search saved notes, selected text, and OCR evidence")
+    search.add_argument("--query", required=True)
+    search.add_argument("--match", choices=["phrase", "all"], default="phrase")
+    search.add_argument("--limit", type=int, default=20)
+    search.add_argument("--asset", help="Restrict results to one asset ID")
+    search.add_argument("--revision", help="Restrict results to one image revision")
+    search.add_argument("--current-only", action="store_true", help="Exclude historical revisions")
+    commands.add_parser("reindex", help="Rebuild derived text documents and FTS5 from saved source records")
     getter = commands.add_parser("get", help="Fetch a memory, annotations, and verified snapshot reference")
     getter.add_argument("asset_id")
     getter.add_argument("--revision", help="Fetch an older revision rather than the current one")
@@ -53,6 +61,11 @@ def main() -> None:
                     result = catalog.import_image(args.file)
                 elif args.command == "list":
                     result = catalog.list_memories()
+                elif args.command == "search":
+                    result = catalog.search(args.query, match=args.match, limit=args.limit,
+                                            asset_id=args.asset, revision_id=args.revision, current_only=args.current_only)
+                elif args.command == "reindex":
+                    result = {"indexed_documents": catalog.rebuild_search()}
                 elif args.command == "get":
                     result = catalog.get_memory(args.asset_id, args.revision)
                 elif args.command == "ocr":

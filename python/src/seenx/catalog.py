@@ -15,10 +15,10 @@ from PIL import Image, ImageOps
 
 from seenx.observability import count, event, stage
 from seenx.paths import LIBRARY_ROOT
-from seenx.catalog_migrations import migrate_v1_to_v2
+from seenx.catalog_migrations import migrate_catalog
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 APPLICATION_ID = 0x534E5858
 SCHEMA = """
 BEGIN IMMEDIATE;
@@ -123,11 +123,11 @@ class Catalog:
                     raise ValueError("This file is not an empty seenX catalog")
                 self.connection.executescript(SCHEMA)
                 version, identity = 1, APPLICATION_ID
-            if identity != APPLICATION_ID or version not in (1, SCHEMA_VERSION):
+            if identity != APPLICATION_ID or version not in range(1, SCHEMA_VERSION + 1):
                 raise ValueError("Unsupported catalog schema; refusing to change it")
-            if version == 1:
-                with stage("catalog_migration", from_version=1, to_version=2):
-                    migrate_v1_to_v2(self.connection)
+            if version < SCHEMA_VERSION:
+                with stage("catalog_migration", from_version=version, to_version=SCHEMA_VERSION):
+                    migrate_catalog(self.connection)
         except BaseException:
             self.connection.close()
             raise
@@ -289,6 +289,16 @@ class Catalog:
     def recognize_text(self, revision_id: str) -> dict:
         from seenx.catalog_ocr import recognize_revision
         return recognize_revision(self, revision_id)
+
+    def search(self, query: str, match: str = "phrase", limit: int = 20,
+               asset_id: str | None = None, revision_id: str | None = None,
+               current_only: bool = False) -> list:
+        from seenx.catalog_search import search_catalog
+        return search_catalog(self.connection, query, match, limit, asset_id, revision_id, current_only)
+
+    def rebuild_search(self) -> int:
+        from seenx.catalog_search import rebuild_index
+        return rebuild_index(self.connection)
 
     def get_memory(self, asset_id: str, revision_id: str | None = None) -> dict:
         from seenx.catalog_ocr import revision_ocr_runs

@@ -28,7 +28,8 @@ class ObservabilityTests(unittest.TestCase):
         with run_context("test") as run_id:
             event("example", query=secret, text=secret, path=secret,
                   record={"content": secret}, embedding=[123], error=secret,
-                  note=secret, selected_text=secret, source_path=secret, snapshot_path=secret, count=2)
+                  note=secret, selected_text=secret, source_path=secret, snapshot_path=secret,
+                  excerpt=secret, content=secret, count=2)
             count("cache_hits", 2)
             with stage("example_stage"):
                 pass

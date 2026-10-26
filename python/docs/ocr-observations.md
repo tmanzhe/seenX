@@ -99,4 +99,4 @@ Tests cover origin conversion, legacy string behavior, observation validation, s
 
 Logs record operation IDs and counts, never recognized text or note bodies. The `seenx-memory` JSON response intentionally includes requested text and boxes. Your inputs remain untouched.
 
-The next retrieval step is FTS5 over catalog notes, selected text, and observations, with results pointing back to stable evidence IDs. Semantic note embeddings, word/range selection, and a native annotation interface remain later work.
+FTS5 retrieval over these saved records is now implemented in [the catalog-search lesson](catalog-search.md), with results pointing back to stable evidence IDs. Semantic note embeddings, word/range selection, and native/shared-engine integration remain later work.

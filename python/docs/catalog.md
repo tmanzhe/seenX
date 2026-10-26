@@ -106,7 +106,7 @@ Snapshots are published only after all bytes are written, then database records 
 - **Primary key:** the unique ID for one row, such as an annotation ID.
 - **Foreign key:** an enforced reference to another row. An annotation can't point at a nonexistent region.
 - **Transaction:** a group of database changes that commit together or roll back together. Region and note creation use one transaction, so a failure can't save half the annotation.
-- **Schema version:** the database layout's version. The original version-1 schema now migrates transactionally to version 2 for OCR observations and quote links. Unknown versions are rejected; we don't silently downgrade a newer catalog.
+- **Schema version:** the database layout's version. Version 2 added OCR observations/quotes; version 3 adds FTS5 retrieval. Pending migrations run together transactionally. Unknown versions are rejected; we don't silently downgrade a newer catalog.
 - **Content-addressed storage:** name a stored object using its byte hash. Identical bytes can reuse the same object. Hash checks detect later snapshot damage.
 - **Class/context manager:** `Catalog` keeps a database connection together with its operations; `with Catalog(...)` closes the connection reliably.
 - **Provenance:** retain where information came from. Imported evidence and user-written meaning have different origins.
@@ -117,6 +117,6 @@ The catalog commands share our local diagnostics. Logs include operation names a
 
 This step proves import → annotate → restart → recover, with changed/missing-original handling, snapshot verification, and transactional edit/delete behavior. The tests use placeholder bytes and mocked image decoding, not generated image fixtures. We also exercised the CLI in separate processes using existing practice photos in an isolated temporary library; the original practice files were unchanged.
 
-The current search command still searches selected folders and derived caches. It doesn't yet search catalog notes. Saved OCR-region selection is available through the CLI, but there is no native annotation UI, FTS5 catalog index, thumbnail generator, complete-library archive, encryption, source/collection authorization, local service, or MCP endpoint in this slice.
+The original folder-search command still uses selected files and derived caches. The new `seenx-memory search` command searches saved notes, selected text, and OCR through FTS5. This Python slice doesn't provide the native interface, thumbnail generator, complete-library archive, encryption, source/collection authorization, service, or MCP endpoint.
 
-Continue with [the OCR observation lesson](ocr-observations.md), then connect selected text and notes to catalog retrieval. Collections, tags, richer assertions, and export/restore remain part of the larger roadmap.
+Continue with [OCR observations](ocr-observations.md) and [catalog retrieval](catalog-search.md). Collections, tags, richer assertions, and export/restore remain part of the larger roadmap.
