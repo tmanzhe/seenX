@@ -78,8 +78,9 @@ class ClipEncoder:
             "revision": MODEL_REVISION,
             "cache_dir": str(MODEL_CACHE),
             "local_files_only": not download,
+            "trust_remote_code": False,
         }
-        self.processor = CLIPProcessor.from_pretrained(MODEL_ID, use_fast=False, **options)
+        self.processor = CLIPProcessor.from_pretrained(MODEL_ID, backend="pil", **options)
         self.model = CLIPModel.from_pretrained(MODEL_ID, use_safetensors=True, **options)
         self.model.to("cpu")
         self.model.eval()
@@ -92,8 +93,8 @@ class ClipEncoder:
         image = ImageOps.exif_transpose(source).convert("RGB")
         inputs = self.processor(images=image, return_tensors="pt")
         with self.torch.inference_mode():
-            features = self.model.get_image_features(**inputs)
-        return normalize_vector(features[0].tolist())
+            features = self.model.get_image_features(**inputs, return_dict=True)
+        return normalize_vector(features.pooler_output[0].tolist())
 
     def encode_text(self, query: str) -> list:
         inputs = self.processor(
@@ -101,8 +102,8 @@ class ClipEncoder:
             max_length=self.model.config.text_config.max_position_embeddings,
         )
         with self.torch.inference_mode():
-            features = self.model.get_text_features(**inputs)
-        return normalize_vector(features[0].tolist())
+            features = self.model.get_text_features(**inputs, return_dict=True)
+        return normalize_vector(features.pooler_output[0].tolist())
 
 
 def collect_embeddings(folder: Path, encoder, limit: int, cache=None,

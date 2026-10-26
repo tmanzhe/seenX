@@ -1,9 +1,43 @@
 """Vector arithmetic tests don't download a model or create images."""
 
 import math
+from contextlib import nullcontext
+from types import SimpleNamespace
 import unittest
+from unittest.mock import Mock, patch
 
-from seenx.visual_search import filter_visual_matches, normalize_vector, rank_images
+from seenx.visual_search import ClipEncoder, filter_visual_matches, normalize_vector, rank_images
+
+
+class ClipOutputTests(unittest.TestCase):
+    def setUp(self):
+        # Transformers 5 returns a structured output. Hidden states aren't the
+        # projected image/text vector used in our shared embedding space.
+        features = SimpleNamespace(pooler_output=[SimpleNamespace(tolist=lambda: [3, 4])])
+        self.encoder = ClipEncoder.__new__(ClipEncoder)
+        self.encoder.torch = SimpleNamespace(inference_mode=nullcontext)
+        self.encoder.processor = Mock(return_value={})
+        self.encoder.model = SimpleNamespace(
+            get_image_features=Mock(return_value=features),
+            get_text_features=Mock(return_value=features),
+            config=SimpleNamespace(text_config=SimpleNamespace(max_position_embeddings=77)),
+        )
+
+    def test_text_uses_projected_features_and_preserves_the_token_limit(self):
+        self.assertEqual(self.encoder.encode_text("a screenshot"), [.6, .8])
+        self.encoder.processor.assert_called_once_with(
+            text=["a screenshot"], return_tensors="pt", padding=True,
+            truncation=True, max_length=77,
+        )
+        self.encoder.model.get_text_features.assert_called_once_with(return_dict=True)
+
+    def test_image_uses_projected_features_after_orientation_and_rgb_conversion(self):
+        with patch("seenx.visual_search.ImageOps.exif_transpose") as transpose:
+            source = object()
+            self.assertEqual(self.encoder.encode_image(source), [.6, .8])
+        transpose.assert_called_once_with(source)
+        transpose.return_value.convert.assert_called_once_with("RGB")
+        self.encoder.model.get_image_features.assert_called_once_with(return_dict=True)
 
 
 class VisualSearchTests(unittest.TestCase):
