@@ -32,6 +32,7 @@ xcuserdata/
 # JavaScript dependencies and web build output
 node_modules/
 .next/
+.test-build/
 /apps/web/out/
 *.tsbuildinfo
 next-env.d.ts

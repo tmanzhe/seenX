@@ -4,6 +4,7 @@
 node_modules
 **/node_modules
 **/.next
+**/.test-build
 apps/web/out
 /python/
 /apps/macos/

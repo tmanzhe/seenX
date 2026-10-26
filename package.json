@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "npm run dev --workspace @seenx/web --",
     "build": "npm run build --workspace @seenx/web",
-    "typecheck": "npm run typecheck --workspace @seenx/web"
+    "typecheck": "npm run typecheck --workspace @seenx/web",
+    "test": "npm test --workspace @seenx/web",
+    "check": "npm run typecheck && npm test && npm run build"
   },
   "engines": {
     "node": ">=20.9.0"

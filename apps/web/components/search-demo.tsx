@@ -2,13 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { demoItems, searchDemo, type DemoItem } from "../lib/demo";
-import { isAnnotation, seedAnnotations, type AnnotationStore, type MemoryAnnotation } from "../lib/memory-annotations";
+import { seedAnnotations, type AnnotationStore, type MemoryAnnotation } from "../lib/memory-annotations";
+import { loadPreviewState, previewStorageKeys } from "../lib/preview-storage";
 import { Icon } from "./icon";
 import { MemoryArtwork } from "./memory-artwork";
 import { MemoryAnnotator } from "./memory-annotator";
 
-const storageKey = "seenx-preview-annotations-v2";
-const captureKey = "seenx-preview-screenshot-v1";
 const captureItem: DemoItem = { ...demoItems[0], id: "capture-layout", title: "Your checkout screenshot", file: "your-checkout-capture.png", location: "Your captures", source: "Pretend screenshot · example.com/shop", note: "" };
 const availableItems = [...demoItems, captureItem];
 
@@ -35,26 +34,9 @@ export function SearchDemo() {
 
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(storageKey);
-      const saved: unknown = JSON.parse(raw ?? "{}");
-      const restored: AnnotationStore = {};
-      if (saved && typeof saved === "object" && !Array.isArray(saved)) {
-        for (const item of availableItems) {
-          const entries = (saved as Record<string, unknown>)[item.id];
-          if (Array.isArray(entries) && entries.length <= 50 && entries.every(isAnnotation)) {
-            restored[item.id] = [...new Map(entries.map((note) => [note.id, note])).values()];
-          }
-        }
-      }
-      if (raw === null) {
-        const old: unknown = JSON.parse(localStorage.getItem("seenx-preview-notes-v1") ?? "{}");
-        if (old && typeof old === "object" && !Array.isArray(old)) for (const item of demoItems) {
-          const text = (old as Record<string, unknown>)[item.id];
-          if (typeof text === "string" && text.length <= 2000) restored[item.id] = text.trim() ? [{ id: `migrated-${item.id}`, text, anchor: { type: "image" } }] : [];
-        }
-      }
-      setStore(restored);
-      setCaptured(localStorage.getItem(captureKey) === "yes" || Boolean(restored[captureItem.id]));
+      const restored = loadPreviewState(localStorage, availableItems, captureItem.id);
+      setStore(restored.annotations);
+      setCaptured(restored.captured);
     } catch { /* A fresh sample still works when browser storage is unavailable. */ }
     setReady(true);
     const shortcut = (event: KeyboardEvent) => {
@@ -76,7 +58,7 @@ export function SearchDemo() {
   function captureScreenshot() {
     notify("Screenshot captured", "Now give the detail a little context.");
     setCaptured(true); setCapturePreview(false); setSelected(captureItem);
-    try { localStorage.setItem(captureKey, "yes"); } catch { /* Keep the sample capture for this visit. */ }
+    try { localStorage.setItem(previewStorageKeys.capture, "yes"); } catch { /* Keep the sample capture for this visit. */ }
   }
 
   function saveAnnotations(next: MemoryAnnotation[]) {
@@ -84,7 +66,7 @@ export function SearchDemo() {
     const updated = { ...store, [selected.id]: next };
     setStore(updated);
     try {
-      localStorage.setItem(storageKey, JSON.stringify(updated));
+      localStorage.setItem(previewStorageKeys.annotations, JSON.stringify(updated));
       const previousCount = notesFor(selected).length;
       notify(next.length < previousCount ? "Note removed" : next.length > previousCount ? "Context saved" : "Memory updated", "Your words and their location stay together.");
       return true;

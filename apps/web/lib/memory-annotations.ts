@@ -4,6 +4,13 @@ export type NoteAnchor = { type: "image" } | { type: "point"; x: number; y: numb
 export type MemoryAnnotation = { id: string; text: string; quote?: string; anchor: NoteAnchor };
 export type AnnotationStore = Record<string, MemoryAnnotation[]>;
 
+export const annotationLimits = {
+  perImage: 50,
+  idLength: 100,
+  textLength: 2000,
+  quoteLength: 4000,
+} as const;
+
 export const clamp = (value: number) => Math.min(1, Math.max(0, value));
 
 export function regionBetween(start: { x: number; y: number }, end: { x: number; y: number }): NoteAnchor {
@@ -22,7 +29,7 @@ export function seedAnnotations(item: DemoItem): MemoryAnnotation[] {
 export function isAnnotation(value: unknown): value is MemoryAnnotation {
   if (!value || typeof value !== "object") return false;
   const note = value as MemoryAnnotation;
-  if (typeof note.id !== "string" || !note.id || note.id.length > 100 || typeof note.text !== "string" || note.text.length > 2000 || (note.quote !== undefined && (typeof note.quote !== "string" || note.quote.length > 4000)) || (!note.text.trim() && !note.quote?.trim()) || !note.anchor || typeof note.anchor !== "object") return false;
+  if (typeof note.id !== "string" || !note.id || note.id.length > annotationLimits.idLength || typeof note.text !== "string" || note.text.length > annotationLimits.textLength || (note.quote !== undefined && (typeof note.quote !== "string" || note.quote.length > annotationLimits.quoteLength)) || (!note.text.trim() && !note.quote?.trim()) || !note.anchor || typeof note.anchor !== "object") return false;
   const anchor = note.anchor;
   if (anchor.type === "image") return true;
   if (anchor.type !== "point" && anchor.type !== "region") return false;

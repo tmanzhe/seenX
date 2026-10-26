@@ -28,10 +28,13 @@ From the repository root:
 npm ci
 npm run dev
 npm run typecheck
+npm test
 npm run build
 ```
 
 Use `npm run dev -- --port 3015` to select another local port. The production export is written to `out/` in this directory.
+
+Run `npm run check` from the repository root for type checking, unit tests, and the production build together. Unit tests use Node's built-in test runner and the existing TypeScript compiler, with no additional test dependency. Compiled tests live in ignored `.test-build/`. They cover browser-storage recovery and migration, annotation validation, and exported coordinates. Storage parsing lives in `lib/preview-storage.ts`, independently of React and browser globals.
 
 Documentation content lives in `lib/docs.tsx`, navigation in `lib/docs-navigation.ts`, and sample memories in `lib/demo.ts`. The shared layout and stylesheet live under `app/`. There is no additional UI framework or remote font dependency.
 
