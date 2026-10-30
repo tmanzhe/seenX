@@ -5,6 +5,7 @@ enum LauncherScreen: Equatable {
     case search
     case library
     case detail(SavedCapture)
+    case catalogDetail(String)
 }
 
 /// A launcher has one window and a back stack; previews never become modal sheets.
@@ -29,6 +30,12 @@ final class LauncherNavigation: ObservableObject {
         actionsPresented = false
         push()
         screen = .detail(capture)
+    }
+
+    func openCatalogHit(id: String) {
+        actionsPresented = false
+        push()
+        screen = .catalogDetail(id)
     }
 
     func back() {
