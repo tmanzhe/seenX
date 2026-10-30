@@ -11,7 +11,7 @@ The hosted website is a separate static preview. It never becomes the user's loc
 | Layer | Exists today | Planned work |
 | --- | --- | --- |
 | Website | Next.js/React/TypeScript, sample capture, authored text boxes, spatial annotations, localStorage, JSON export | Maintain truthful product/docs copy and demo behavior |
-| Python prototype | Image/PDF reading, Vision OCR strings/boxes, folder text/visual retrieval, caching, diagnostics, versioned memory catalog, OCR quotes, FTS5 evidence search, versioned local read-only search/fetch contract, source/collection grants, and complete/context-only library archives | Write/export engine contract, word/range selection, richer relationships/organization, catalog visual fusion, semantic note retrieval, selected-collection export |
+| Python prototype | Image/PDF reading, Vision OCR strings/boxes, folder text/visual retrieval, caching, diagnostics, versioned memory catalog, OCR quotes, FTS5 evidence search, versioned local read-only search/fetch contract, source/collection grants | Write/export engine contract, word/range selection, richer relationships/organization, catalog visual fusion, semantic note retrieval, selected-collection export |
 | Native Mac app | SwiftUI/AppKit menu-bar app: translucent search, global shortcuts, system region capture, Vision text highlights, notes, separate capture library; launcher catalog search/fetch and optional Python catalog browser through the same typed Swift client | Explicit capture import/write integration, ScreenCaptureKit adapter, source permissions, production distribution |
 | Assistant bridge | Optional Python stdio MCP server exposing grant-scoped `search` and `fetch` over the version-1 contract | Client installation/compatibility verification and agent evaluation harness |
 
@@ -108,7 +108,7 @@ Source permissions, capture permissions, and assistant collection grants are sep
 
 ## Portable library contract · V1
 
-The [Python reference archive slice](../python/docs/library-archive.md) implements whole-library complete/context-only ZIP exports with a versioned manifest and per-payload SHA-256 checksums. Restore requires an absent destination, validates paths/catalog relations, rebuilds derived search data, and optionally copies hash-matched originals from a supplied folder. Verification reports missing, corrupt, and relinked objects. Source and collection grants deliberately do not transfer: restored libraries start deny-by-default, as required by roadmap item 06. This slice has no encryption, merge, selected-collection export, or archive-schema migration.
+See [Python library archive commands](../python/docs/library-archive.md).
 
 Backup/restore carries durable meaning across computers. A complete-library archive includes selected originals; a context-only export requires relinking the matching originals. Neither is a full laptop/OS migration tool.
 

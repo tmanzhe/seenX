@@ -20,7 +20,7 @@ It exposes exactly `search` and `fetch` over stdio. See the [MCP client config a
 
 ## Start here: uv manages the environment
 
-Whole-library complete/context-only archives are available through `seenx-memory export`, `restore`, and `verify`. See [portable Python libraries](docs/library-archive.md) for exact commands, hash-based original relinking, and the deliberate exclusion of grants on restore. Archives are unencrypted; every restore requires a new library path.
+See [library archive commands](docs/library-archive.md) for export, restore, and verification.
 
 From the repository root:
 
@@ -125,7 +125,7 @@ Each scan checks the source path, file size, modification timestamp, and reader/
 
 Saved rows survive closing Python or restarting the Mac. There is no expiry timer today. Removed files stop appearing on the next scan, but old rows stay on disk until the database is cleared. To clear extraction data, stop the program and delete `python/.cache/records.sqlite3`. That doesn't delete the originals or model download. The database is unencrypted local data and ignored by Git.
 
-Your own notes belong in the separate `python/library/catalog.sqlite3`, with managed image snapshots under `python/library/objects/`. Clearing `.cache` leaves them intact. The library is durable personal data and is also ignored by Git. It isn't a backup by itself; use [library export/restore](docs/library-archive.md) to make a portable archive.
+Your own notes belong in the separate `python/library/catalog.sqlite3`, with managed image snapshots under `python/library/objects/`. Clearing `.cache` leaves them intact. The library is durable personal data and is also ignored by Git. It isn't a backup by itself.
 
 Caching is not learning. It doesn't change model weights, recognize new concepts, or remember whether you liked a result. Query vectors are computed again. Each new terminal process still loads the model into memory, even with cached image vectors; a future service could keep the model instance alive between requests.
 
