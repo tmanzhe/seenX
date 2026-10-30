@@ -3,6 +3,7 @@
 import sqlite3
 
 from seenx.catalog_search_schema import V3_STATEMENTS
+from seenx.catalog_access import V4_STATEMENTS
 
 V2_STATEMENTS = (
     """CREATE TABLE ocr_runs (
@@ -57,9 +58,9 @@ def migrate_catalog(connection: sqlite3.Connection) -> None:
             connection.execute("BEGIN IMMEDIATE")
             # Recheck under the write lock; all pending upgrades commit together.
             version = connection.execute("PRAGMA user_version").fetchone()[0]
-            if version not in (1, 2, 3):
+            if version not in (1, 2, 3, 4):
                 raise ValueError("Unsupported catalog schema")
-            for target, statements in ((2, V2_STATEMENTS), (3, V3_STATEMENTS)):
+            for target, statements in ((2, V2_STATEMENTS), (3, V3_STATEMENTS), (4, V4_STATEMENTS)):
                 if version < target:
                     for statement in statements:
                         connection.execute(statement)

@@ -16,9 +16,10 @@ from PIL import Image, ImageOps
 from seenx.observability import count, event, stage
 from seenx.paths import LIBRARY_ROOT
 from seenx.catalog_migrations import migrate_catalog
+from seenx.catalog_access import AccessGrants
 
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 APPLICATION_ID = 0x534E5858
 SCHEMA = """
 BEGIN IMMEDIATE;
@@ -128,6 +129,7 @@ class Catalog:
             if version < SCHEMA_VERSION:
                 with stage("catalog_migration", from_version=version, to_version=SCHEMA_VERSION):
                     migrate_catalog(self.connection)
+            self.access = AccessGrants(self.connection)
         except BaseException:
             self.connection.close()
             raise
@@ -292,9 +294,12 @@ class Catalog:
 
     def search(self, query: str, match: str = "phrase", limit: int = 20,
                asset_id: str | None = None, revision_id: str | None = None,
-               current_only: bool = False) -> list:
+               current_only: bool = False, *, principal_id: str | None = None,
+               trusted_local: bool | None = None) -> list:
+        """Owner-local by default; supplying a principal always selects grants."""
         from seenx.catalog_search import search_catalog
-        return search_catalog(self.connection, query, match, limit, asset_id, revision_id, current_only)
+        return search_catalog(self.connection, query, match, limit, asset_id, revision_id, current_only,
+                              principal_id=principal_id, trusted_local=trusted_local)
 
     def rebuild_search(self) -> int:
         from seenx.catalog_search import rebuild_index
