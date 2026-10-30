@@ -235,7 +235,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!)
             return
         }
-        if !CGPreflightScreenCaptureAccess() { _ = CGRequestScreenCaptureAccess() }
         retryScreenAccess()
     }
 
@@ -245,13 +244,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         Task { @MainActor in
             defer { checkingScreenAccess = false }
             do {
-                // Check the actual capture API; a stale preflight flag must not block it.
                 try await NativeServices.checkCaptureAccess()
                 permissionDenied = false
                 let pending = pendingCaptureMode
                 pendingCaptureMode = nil
                 completeSetup()
                 if let pending { beginCapture(annotate: pending) } else { showSearch() }
+            } catch ScreenAccessFailure.relaunchRequired {
+                showScreenAccessGranted()
             } catch {
                 permissionDenied = true
                 showOnboarding()
@@ -260,6 +260,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 }
             }
         }
+    }
+
+    private func showScreenAccessGranted() {
+        permissionDenied = false
+        pendingCaptureMode = nil
+        completeSetup()
+        showSearch()
+        let alert = NSAlert()
+        alert.alertStyle = .informational
+        alert.messageText = "Permission granted, please relaunch"
+        alert.informativeText = "Restart seenX to finish setting up screen access."
+        alert.addButton(withTitle: "Restart seenX")
+        alert.addButton(withTitle: "Later")
+        if alert.runModal() == .alertFirstButtonReturn { restartApplication() }
     }
 
     private func restartApplication() {
@@ -386,7 +400,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 onboardingPanel?.orderOut(nil)
                 editorPanel?.orderOut(nil)
                 engineBrowser?.window?.orderOut(nil)
-                // Give WindowServer a frame to remove the panels before the system picker.
+                // Give WindowServer a frame to remove the panels before selection.
                 try? await Task.sleep(nanoseconds: 180_000_000)
                 guard let url = try await NativeServices.capture() else { capturing = false; return }
                 capturing = false
@@ -404,6 +418,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                         session?.error = "Could not save: \(error.localizedDescription). Your screenshot is still open; try Save again."
                     }
                 }
+            } catch ScreenAccessFailure.relaunchRequired {
+                capturing = false
+                showScreenAccessGranted()
             } catch {
                 capturing = false
                 if NativeServices.isScreenPermissionError(error) {
