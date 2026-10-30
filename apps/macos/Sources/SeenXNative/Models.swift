@@ -17,6 +17,22 @@ struct Highlight: Codable, Identifiable, Equatable {
     var text: String { boxes.map(\.text).joined(separator: " ") }
 }
 
+/// Immutable evidence metadata. Dimensions describe the orientation-corrected image;
+/// the stored original bytes retain their orientation metadata.
+struct CaptureImageRevision: Codable, Equatable {
+    var id: UUID
+    var sha256: String
+    var pixelWidth: Int
+    var pixelHeight: Int
+    var exifOrientation: Int
+}
+
+/// A lossless native-library record and its original encoded image, for explicit import/read-back.
+struct CaptureImport: Equatable {
+    var capture: SavedCapture
+    var originalImage: Data
+}
+
 struct SavedCapture: Codable, Identifiable, Equatable {
     var id: UUID
     var createdAt: Date
@@ -26,6 +42,9 @@ struct SavedCapture: Codable, Identifiable, Equatable {
     var highlights: [Highlight]
     // Optional for compatibility with manifests written by the first prototype.
     var ocrComplete: Bool? = nil
+    // nil means unavailable in a legacy manifest, rather than an empty OCR result.
+    var boxes: [TextBox]? = nil
+    var imageRevision: CaptureImageRevision? = nil
     var title: String {
         if let first = note.split(separator: "\n").first, !first.isEmpty { return String(first.prefix(80)) }
         if !text.isEmpty { return String(text.prefix(80)) }
