@@ -22,6 +22,18 @@ def main() -> None:
     importer = commands.add_parser("import", help="Preserve an image revision; leave its source untouched")
     importer.add_argument("file", type=Path)
     commands.add_parser("list", help="List saved assets and annotation counts")
+    collection = commands.add_parser("collection-create", help="Create an owner-managed collection")
+    collection.add_argument("name")
+    for command in ("collection-add", "collection-remove"):
+        membership = commands.add_parser(command, help="Change collection membership (affects collection grants)")
+        membership.add_argument("collection_id")
+        membership.add_argument("asset_id")
+    for command in ("grant", "revoke"):
+        access = commands.add_parser(command, help="Owner-managed assistant source or collection access")
+        access.add_argument("principal_id")
+        scope = access.add_mutually_exclusive_group(required=True)
+        scope.add_argument("--source", help="Imported-file source ID (the stable asset ID)")
+        scope.add_argument("--collection", help="Collection ID")
     search = commands.add_parser("search", help="Search saved notes, selected text, and OCR evidence")
     search.add_argument("--query", required=True)
     search.add_argument("--match", choices=["phrase", "all"], default="phrase")
@@ -61,6 +73,18 @@ def main() -> None:
                     result = catalog.import_image(args.file)
                 elif args.command == "list":
                     result = catalog.list_memories()
+                elif args.command == "collection-create":
+                    result = {"collection_id": catalog.access.create_collection(args.name)}
+                elif args.command in ("collection-add", "collection-remove"):
+                    operation = catalog.access.add_member if args.command == "collection-add" else catalog.access.remove_member
+                    operation(args.collection_id, args.asset_id)
+                    result = {"collection_id": args.collection_id, "asset_id": args.asset_id, "updated": True}
+                elif args.command in ("grant", "revoke"):
+                    scope = "source" if args.source is not None else "collection"
+                    target_id = args.source if args.source is not None else args.collection
+                    getattr(catalog.access, f"{args.command}_{scope}")(args.principal_id, target_id)
+                    result = {"principal_id": args.principal_id, "scope": scope, "target_id": target_id,
+                              "granted": args.command == "grant"}
                 elif args.command == "search":
                     result = catalog.search(args.query, match=args.match, limit=args.limit,
                                             asset_id=args.asset, revision_id=args.revision, current_only=args.current_only)
