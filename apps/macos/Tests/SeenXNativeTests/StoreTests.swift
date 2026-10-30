@@ -23,6 +23,7 @@ final class StoreTests: XCTestCase {
         XCTAssertEqual(secondReload.captures.first?.highlights.first?.text, box.text)
         XCTAssertEqual(secondReload.captures.first?.note, "Read this tomorrow")
         XCTAssertEqual(secondReload.captures.first?.ocrComplete, true)
+        XCTAssertEqual(secondReload.captures.first?.boxes?.first?.text, "query plans")
     }
 
     @MainActor
@@ -74,6 +75,77 @@ final class StoreTests: XCTestCase {
         try FileManager.default.removeItem(at: store.imageURL(for: saved))
         let reloaded = try CaptureStore(directory: store.directory)
         XCTAssertEqual(reloaded.results(for: "durable").first?.note, "A durable note")
+    }
+
+    @MainActor
+    func testExplicitImportRoundTripsAllDataAndOriginalBytesAfterReload() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let source = try makeImage(in: directory)
+        let original = try Data(contentsOf: source)
+        let writer = try CaptureStore(directory: directory.appendingPathComponent("writer"))
+        let selected = TextBox(text: "選択 café\nline two", x: 0.125, y: 0.25, width: 0.5, height: 0.125)
+        let unselected = TextBox(text: "OCR outside highlights", x: 0, y: 0.75, width: 1, height: 0.25)
+        let highlights = [Highlight(boxes: [selected]), Highlight(boxes: [unselected, selected])]
+        let note = "  A note 📝\nKeep whitespace.  "
+        let saved = try writer.save(image: source, note: note, boxes: [selected, unselected],
+                                    highlights: highlights, ocrComplete: true)
+        XCTAssertEqual(saved.boxes, [selected, unselected])
+        XCTAssertEqual(saved.highlights, highlights)
+        XCTAssertEqual(saved.note, note)
+        XCTAssertEqual(saved.text, [selected.text, unselected.text].joined(separator: " "))
+        let revision = try XCTUnwrap(saved.imageRevision)
+        XCTAssertEqual(revision.pixelWidth, 12)
+        XCTAssertEqual(revision.pixelHeight, 12)
+        XCTAssertEqual(revision.exifOrientation, 1)
+        XCTAssertEqual(revision.sha256.count, 64)
+
+        let expected = CaptureImport(capture: saved, originalImage: original)
+        XCTAssertEqual(try CaptureStore(directory: writer.directory).readCapture(id: saved.id), expected)
+        let destination = try CaptureStore(directory: directory.appendingPathComponent("destination"))
+        XCTAssertEqual(try destination.importCapture(expected), saved)
+        // Neither the source path nor the first library is required for read-back.
+        try FileManager.default.removeItem(at: source)
+        try FileManager.default.removeItem(at: writer.directory)
+        let reopened = try CaptureStore(directory: destination.directory)
+        let actual = try reopened.readCapture(id: saved.id)
+        XCTAssertEqual(actual.originalImage, original)
+        XCTAssertEqual(actual.capture, expected.capture)
+        XCTAssertEqual(actual, expected)
+        XCTAssertThrowsError(try reopened.importCapture(expected))
+        XCTAssertEqual(reopened.captures, [saved])
+        XCTAssertEqual(try reopened.readCapture(id: saved.id), expected)
+    }
+
+    @MainActor
+    func testReadBackDetectsChangedOriginalAndPreservesMetadata() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let source = try makeImage(in: directory)
+        let store = try CaptureStore(directory: directory.appendingPathComponent("library"))
+        let saved = try store.save(image: source, note: "Retain this evidence", boxes: [], highlights: [])
+        try Data("changed original".utf8).write(to: store.imageURL(for: saved))
+        let reopened = try CaptureStore(directory: store.directory)
+        XCTAssertThrowsError(try reopened.readCapture(id: saved.id))
+        XCTAssertEqual(reopened.captures, [saved])
+    }
+
+    @MainActor
+    func testLegacyManifestKeepsUnknownOCRBoxesAndRevisionUnknown() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let id = UUID()
+        let json = """
+        [{"id":"\(id.uuidString)","createdAt":0,"imageName":"legacy.png",
+          "note":"Legacy note","text":"Legacy OCR","highlights":[]}]
+        """
+        try Data(json.utf8).write(to: directory.appendingPathComponent("library.json"))
+        let store = try CaptureStore(directory: directory)
+        XCTAssertNil(store.captures.first?.boxes)
+        XCTAssertNil(store.captures.first?.imageRevision)
+        XCTAssertEqual(store.captures.first?.text, "Legacy OCR")
+        XCTAssertEqual(store.captures.first?.note, "Legacy note")
     }
 
     @MainActor
