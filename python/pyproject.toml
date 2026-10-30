@@ -17,6 +17,7 @@ visual = ["torch>=2.6,<3", "transformers>=5.10,<6"]
 seenx-inspect = "seenx.load_images:main"
 seenx-visual = "seenx.visual_search:main"
 seenx-search = "seenx.search_files:main"
+seenx-eval = "seenx.retrieval_eval:main"
 seenx-memory = "seenx.memory_cli:main"
 seenx-engine = "seenx.engine_stdio:main"
 
