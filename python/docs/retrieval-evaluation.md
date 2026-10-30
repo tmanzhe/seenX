@@ -133,9 +133,17 @@ For a query with relevant ID set `R` and accepted ranked results `L`:
   responses (any nonempty result), plus the false-positive query rate. Undefined
   means/rates are JSON `null`, never a fabricated zero or perfect score.
 
-No shared Wilson-interval helper exists in the repository, so no new statistical
-library or formula was introduced. Reports explicitly mark confidence intervals
-unavailable. Macro recall and MRR also should not be treated as binomial rates.
+The dependency-free `seenx.statistics.wilson_interval(hits, total, confidence=0.95)`
+returns two-sided Wilson score bounds, or `None` for zero trials. Per-query
+`recall_at_k_estimates[k]` puts `value`, distinct `hits`, `total`, and the 95%
+`interval: [lower, upper]` together next to the existing numeric `recall_at_k`.
+Summary `micro_recall_at_k[k]` uses the same shape after pooling query hit/total
+counts. Existing macro `recall_at_k` and MRR remain unchanged; neither is a
+binomial proportion, so no Wilson interval is attached to those macro means.
+No-match queries have null recall/interval and do not enter the pooled counts.
+These are descriptive intervals under independent relevant-item trials, not
+dataset-wide quality guarantees: repeated items and correlated queries can make
+them optimistic. `confidence_intervals` records the method, confidence, and scope.
 
 Evaluation scans **all supported files at the top level** of the selected folder,
 instead of inheriting the interactive ten-file default. It requests the full

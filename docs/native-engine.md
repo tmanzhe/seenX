@@ -48,7 +48,7 @@ The operating system supplies two pipes: one carries requests into the helper's 
 
 No HTTP server is needed for this local development connection. The client code lives in its own [Swift package](../packages/SeenXEngineClient); its contract can be tested independently of windows, permission dialogs, and capture shortcuts. Python remains our behavior reference while we decide which pieces belong in the eventual native engine.
 
-The helper is launched from the repository you deliberately select. The library directory is a launch argument, not something a search request can change. This connection is trusted local access to that whole catalog; assistant grants and an MCP adapter haven't been added.
+The helper is launched from the repository you deliberately select. The library directory is a launch argument, not something a search request can change. The first-party app explicitly launches with `--trusted-local` for whole-catalog access. Grant-scoped callers use persisted Python engine grants and default deny; an MCP adapter hasn't been added. See [grant semantics](../python/docs/engine-contract.md#owner-managed-source-and-collection-grants).
 
 ## Images and coordinates
 

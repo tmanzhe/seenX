@@ -7,7 +7,7 @@ import SeenXEngineClient
 
 let client = try await EngineClient.launch(configuration: .init(
     executableURL: repository.appendingPathComponent("python/.venv/bin/python"),
-    arguments: ["-m", "seenx.engine_stdio", "--library", library.path, "--no-log"],
+    arguments: ["-m", "seenx.engine_stdio", "--library", library.path, "--trusted-local", "--no-log"],
     currentDirectoryURL: repository
 ))
 let hits = try await client.search("remember this")

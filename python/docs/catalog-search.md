@@ -86,7 +86,7 @@ uv run --project python seenx-memory search --query "spacing" --asset ASSET_ID
 uv run --project python seenx-memory search --query "spacing" --revision REVISION_ID --limit 5
 ```
 
-These are local query filters, not assistant-access grants. The authorization boundary for a future service/MCP adapter remains separate work. Filenames, source paths, unimported files, and PDF contents aren't added to this catalog index in this step.
+These are local query filters, not assistant-access grants. The [shared engine contract](engine-contract.md#owner-managed-source-and-collection-grants) now applies persisted source/collection grants independently, before the search limit and on direct fetches. Filenames, source paths, unimported files, and PDF contents aren't added to this catalog index in this step.
 
 ## Keeping results fresh
 
@@ -122,4 +122,4 @@ Logs include query length, matching mode, stage time, and result count, not raw 
 - `BM25 ranking`: ordering lexical matches without treating a score as confidence.
 - `parameterized SQL queries`: keeping values separate from SQL syntax.
 
-Next: define and evaluate the shared local engine search/fetch contract, then connect an interface. Visual catalog retrieval, semantic note paraphrases, word-level selection, and source/collection grants remain unfinished. This step adds lexical catalog retrieval, not proof of broad retrieval accuracy.
+The shared local engine search/fetch contract now connects the native interface and enforces source/collection grants for other callers. Visual catalog retrieval, semantic note paraphrases, and word-level selection remain unfinished. This step adds lexical catalog retrieval, not proof of broad retrieval accuracy.

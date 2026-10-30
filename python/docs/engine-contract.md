@@ -23,7 +23,7 @@ The response has this shape:
   "trace_id": "an-engine-generated-correlation-id",
   "result": {
     "protocol_version": 1,
-    "catalog_schema_version": 3,
+    "catalog_schema_version": 4,
     "read_only_requests": true,
     "methods": ["engine.info", "memory.fetch", "memory.search", "region.fetch"],
     "limits": {}
@@ -33,7 +33,26 @@ The response has this shape:
 
 The actual `limits` object lists the byte, pixel, and result caps below. The protocol version identifies the wire contract; the catalog schema version identifies the database layout. They serve different purposes and needn't have the same number.
 
-For another library, launch with `--library /path/to/library`. A request cannot change that root or supply an arbitrary filesystem path. The local launcher chooses the library; this version grants that trusted process access to its whole selected library. Collection/source grants, revocation, MCP client setup, and untrusted remote access remain separate work.
+For another library, launch with `--library /path/to/library`. A request cannot change that root or supply an arbitrary filesystem path. Caller access is fixed at launch: `--principal assistant-a` uses persisted grants; no principal and no trusted flag exposes no evidence. The first-party native app explicitly supplies `--trusted-local` for its owner-selected whole library, as intended by the architecture. These options are mutually exclusive and cannot be supplied in request JSON.
+
+### Owner-managed source and collection grants
+
+Catalog schema 4 adds `source_grants`, `collection_grants`, `collections`, and `collection_assets` to the library's `catalog.sqlite3`. Upgrades preserve evidence IDs and create no grants. The trusted Python owner API is `catalog.access` (`AccessGrants`); the local `seenx-memory` CLI can manage it:
+
+```sh
+seenx-memory --library /path/to/library grant assistant-a --source ASSET_ID
+seenx-memory --library /path/to/library revoke assistant-a --source ASSET_ID
+seenx-memory --library /path/to/library collection-create Shared
+seenx-memory --library /path/to/library collection-add COLLECTION_ID ASSET_ID
+seenx-memory --library /path/to/library grant assistant-a --collection COLLECTION_ID
+seenx-memory --library /path/to/library revoke assistant-a --collection COLLECTION_ID
+```
+
+Currently a **source is one imported file**, identified by its stable asset ID across all revisions; this is distinct from FTS's internal annotation/observation `source_id`. Folder/app/URL source groups are not implemented. A source grant **or** membership in a granted collection permits the whole asset, including historical revisions and annotations. Collection membership is live: `collection-add` authorizes new members and `collection-remove` removes that route to access. Revoking one grant leaves any other matching grant effective. Removing an asset cascades its source grants and memberships.
+
+The version-1 engine applies the same grant predicate to search candidates **before LIMIT** and to both fetch methods before reading evidence. An ungranted asset (including an unknown ID) returns `access_denied`; search silently excludes ungranted hits, even with explicit asset/revision filters. Grants are re-read on every request, so committed revocation affects subsequent calls in an existing session. The existing single-owner/sequential-request assumption remains; in-flight disclosures cannot be recalled. Direct `Catalog` reads and `seenx-memory search/get` are trusted owner APIs; supplying `principal_id` to `Catalog.search` selects grant filtering automatically.
+
+Identity and trusted mode are host configuration, not authentication. A future MCP adapter must bind its authenticated client to a principal and must never let that client choose a principal, trusted mode, grant writes, or the catalog path. No MCP server or external authentication is implemented here. Local processes with direct filesystem/catalog access remain trusted OS-account owners.
 
 Requests are read-only. Startup can initialize or migrate the catalog and its derived index, just like the existing CLI. Use `seenx-memory` for deliberate import, annotation, editing, removal, OCR, or reindexing. No write methods are exposed through this protocol yet.
 
@@ -119,20 +138,20 @@ Error responses have `error` instead of `result`:
 {"version":1,"id":"request-1","trace_id":"...","error":{"code":"not_found","message":"Requested memory, revision, or target was not found"}}
 ```
 
-Codes include `invalid_json`, `invalid_request`, `unsupported_version`, `unknown_method`, `invalid_parameters`, `request_too_large`, `response_too_large`, `resource_limit`, `not_found`, `evidence_unavailable`, `storage_error`, and `internal_error`. Clients should branch on the code, not parse the message. Raw exception details and filesystem paths aren't echoed into wire errors.
+Codes include `invalid_json`, `invalid_request`, `unsupported_version`, `unknown_method`, `invalid_parameters`, `request_too_large`, `response_too_large`, `resource_limit`, `access_denied`, `not_found`, `evidence_unavailable`, `storage_error`, and `internal_error`. Clients should branch on the code, not parse the message. Raw exception details and filesystem paths aren't echoed into wire errors.
 
 An invalid request doesn't terminate the session. An overlong input line is drained to its newline before reading the next request, so subsequent frames remain aligned. Closing stdin ends the process cleanly. Startup failure returns a nonzero exit code and a short stderr diagnostic. A native client must handle process exit and cancellation as well as method errors.
 
 ## Native integration sequence
 
-1. Launch the helper with the explicitly selected library and keep stdin open.
+1. Launch the first-party helper with the explicitly selected library and `--trusted-local`, and keep stdin open.
 2. Handshake with `engine.info` and check protocol support.
 3. Send a search request and decode evidence hits.
 4. Fetch the selected memory or saved region by its returned IDs.
 5. Decode an optional PNG and display it with its explicit dimensions/coordinate context.
 6. On shutdown, close stdin and wait for exit. Handle transport failure without discarding an unsaved native draft.
 
-Requests are processed sequentially in this slice. There is no request cancellation message, background indexing queue, or automatic native-library import. The native development library is still separate; migrating its captures and adding deliberate write operations need an explicit next integration step. Don't expose this whole-library internal helper directly as an assistant tool without adding the planned grants and adapter.
+Requests are processed sequentially in this slice. There is no request cancellation message, background indexing queue, or automatic native-library import. The native development library is still separate; migrating its captures and adding deliberate write operations need an explicit next integration step. Assistant integration must use grant-scoped access through a separately implemented adapter.
 
 ## Verification and learning concepts
 
