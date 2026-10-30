@@ -39,6 +39,8 @@ final class EngineBrowserModel: ObservableObject {
     private var client: EngineClient?
     // Closing/reconnecting invalidates outstanding completions before they touch UI.
     private var generation = UUID()
+    private var searchDebounce: Task<Void, Never>?
+    private var pendingSearch = false
 
     func chooseLibrary() {
         guard !busy else { return }
@@ -89,12 +91,14 @@ final class EngineBrowserModel: ObservableObject {
                 report(error)
             }
             guard generation == token else { return }
-            busy = false
+            finishRequest()
         }
     }
 
     func disconnect() {
         generation = UUID()
+        searchDebounce?.cancel()
+        pendingSearch = false
         let previous = client
         client = nil
         connected = false
@@ -109,8 +113,31 @@ final class EngineBrowserModel: ObservableObject {
         Task { await previous?.close() }
     }
 
+    /// The launcher types ahead while a bounded request finishes. Only the latest query is shown.
+    func updateSearchQuery(_ value: String) {
+        searchDebounce?.cancel()
+        pendingSearch = false
+        query = value
+        hits = []
+        selected = nil
+        memory = nil
+        image = nil
+        searched = false
+        if connected { error = nil }
+        guard !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        let token = generation
+        searchDebounce = Task {
+            do { try await Task.sleep(nanoseconds: 250_000_000) }
+            catch { return }
+            guard generation == token else { return }
+            pendingSearch = true
+            if !busy { search() }
+        }
+    }
+
     func search() {
         guard !busy, let client, !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        pendingSearch = false
         let token = generation
         let requestedQuery = query
         busy = true
@@ -124,13 +151,13 @@ final class EngineBrowserModel: ObservableObject {
             do {
                 let results = try await client.search(requestedQuery, limit: 30)
                 guard generation == token else { return }
-                hits = results
+                if query == requestedQuery { hits = results }
             } catch {
                 guard generation == token else { return }
                 report(error)
             }
             guard generation == token else { return }
-            busy = false
+            finishRequest()
         }
     }
 
@@ -165,8 +192,13 @@ final class EngineBrowserModel: ObservableObject {
                 report(error)
             }
             guard generation == token else { return }
-            busy = false
+            finishRequest()
         }
+    }
+
+    private func finishRequest() {
+        busy = false
+        if pendingSearch, connected { search() }
     }
 
     private func report(_ failure: Error) {
@@ -239,42 +271,55 @@ struct EngineLibraryView: View {
                         }
                     }.padding(8)
                 }.frame(minWidth: 240, idealWidth: 320, maxWidth: 400)
-                VStack(alignment: .leading, spacing: 12) {
-                    if let selected = model.selected {
-                        Text(model.memory?.asset.sourceName ?? "Saved evidence").font(.headline)
-                        Text(selected.excerpt).textSelection(.enabled)
-                        HStack {
-                            Button("Full image") { model.open(selected) }
-                            Button("Saved region") { model.open(selected, crop: true) }
-                                .disabled(selected.regionID == nil && selected.observationID == nil)
-                        }.disabled(model.busy)
-                        if let image = model.image {
-                            EngineEvidenceImage(image: image, target: model.showingCrop ? nil : selected.target)
-                            Text(model.showingCrop ? "Saved-region crop" : "Exact saved revision · highlighted match")
-                                .font(.caption).foregroundStyle(.secondary)
-                        } else { Spacer() }
-                        if let memory = model.memory {
-                            ScrollView {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    ForEach(memory.annotations) { annotation in
-                                        if !annotation.note.isEmpty { Text(annotation.note).textSelection(.enabled) }
-                                        if !annotation.selectedText.isEmpty {
-                                            Text(annotation.selectedText).foregroundStyle(.secondary).textSelection(.enabled)
-                                        }
-                                    }
-                                }.frame(maxWidth: .infinity, alignment: .leading)
-                            }.frame(maxHeight: 120)
-                        }
-                    } else {
-                        Text("Select a match to fetch its saved image and context.").foregroundStyle(.secondary)
-                        Spacer()
-                    }
-                }.padding().frame(minWidth: 360, maxWidth: .infinity, maxHeight: .infinity)
+                EngineEvidenceDetail(model: model)
+                    .frame(minWidth: 360, maxWidth: .infinity, maxHeight: .infinity)
             }
             Divider()
             Text("Read-only development connection · lexical search · no automatic capture import")
                 .font(.caption).foregroundStyle(.secondary).padding(10)
         }
+    }
+}
+
+struct EngineEvidenceDetail: View {
+    @ObservedObject var model: EngineBrowserModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let selected = model.selected {
+                Text(model.memory?.asset.sourceName ?? "Saved evidence").font(.headline)
+                Text(selected.excerpt).textSelection(.enabled)
+                Text("\(selected.matchedField) · \(selected.provenance.origin) · \(selected.provenance.confirmation)")
+                    .font(.caption).foregroundStyle(.secondary)
+                if !selected.isCurrentRevision { Text("Earlier revision").font(.caption).foregroundStyle(.secondary) }
+                HStack {
+                    Button("Full image") { model.open(selected) }
+                    Button("Saved region") { model.open(selected, crop: true) }
+                        .disabled(selected.regionID == nil && selected.observationID == nil)
+                    if model.busy { ProgressView().controlSize(.small) }
+                }.disabled(model.busy || !model.connected)
+                if let image = model.image {
+                    EngineEvidenceImage(image: image, target: model.showingCrop ? nil : selected.target)
+                    Text(model.showingCrop ? "Saved-region crop" : "Exact saved revision · highlighted match")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else { Spacer() }
+                if let memory = model.memory {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(memory.annotations) { annotation in
+                                if !annotation.note.isEmpty { Text(annotation.note).textSelection(.enabled) }
+                                if !annotation.selectedText.isEmpty {
+                                    Text(annotation.selectedText).foregroundStyle(.secondary).textSelection(.enabled)
+                                }
+                            }
+                        }.frame(maxWidth: .infinity, alignment: .leading)
+                    }.frame(maxHeight: 120)
+                }
+            } else {
+                Text("Select a match to fetch its saved image and context.").foregroundStyle(.secondary)
+                Spacer()
+            }
+        }.padding()
     }
 }
 
