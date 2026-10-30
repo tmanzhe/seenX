@@ -40,7 +40,7 @@ class CatalogAccessTests(unittest.TestCase):
     def test_version_three_upgrade_preserves_ids_and_index_and_creates_no_grants(self):
         with Catalog(self.root) as catalog:
             self.assertEqual(catalog.connection.execute("PRAGMA user_version").fetchone()[0], SCHEMA_VERSION)
-            self.assertEqual(catalog.search("legacy thought")[0]["annotation_id"], "note")
+            self.assertEqual(catalog.search("legacy thought", trusted_local=True)[0]["annotation_id"], "note")
             self.assertEqual(catalog.search("legacy thought", principal_id="assistant"), [])
             self.assertFalse(catalog.access.allows("assistant", "asset"))
             self.assertEqual(catalog.connection.execute("SELECT count(*) FROM source_grants").fetchone()[0], 0)
@@ -56,7 +56,7 @@ class CatalogAccessTests(unittest.TestCase):
             self.assertIsNone(connection.execute("SELECT name FROM sqlite_master WHERE name = 'collections'").fetchone())
             self.assertEqual(connection.execute("SELECT note FROM annotations").fetchone()[0], "Legacy thought")
         with Catalog(self.root) as catalog:
-            self.assertEqual(catalog.search("legacy thought")[0]["annotation_id"], "note")
+            self.assertEqual(catalog.search("legacy thought", trusted_local=True)[0]["annotation_id"], "note")
 
     def test_all_pending_migrations_roll_back_if_access_upgrade_fails(self):
         old = self.root / "version-one"
@@ -85,6 +85,25 @@ class CatalogAccessTests(unittest.TestCase):
                            {"trusted_local": True, "principal_id": "assistant"}):
                 with self.assertRaises(ValueError):
                     Engine(catalog, **kwargs)
+
+    def test_evidence_reads_require_explicit_access_context(self):
+        from seenx.catalog_search import search_catalog
+
+        with Catalog(self.root) as catalog:
+            operations = (
+                lambda **kwargs: catalog.search("legacy thought", **kwargs),
+                lambda **kwargs: search_catalog(catalog.connection, "legacy thought", **kwargs),
+                lambda **kwargs: catalog.get_memory("asset", **kwargs),
+                lambda **kwargs: catalog.read_revision_bytes("revision", **kwargs),
+            )
+            for operation in operations:
+                for context in ({}, {"trusted_local": False}, {"trusted_local": None},
+                                {"trusted_local": 1}, {"principal_id": ""},
+                                {"principal_id": "assistant", "trusted_local": True}):
+                    with self.subTest(context=context), self.assertRaises(ValueError):
+                        operation(**context)
+            self.assertEqual(catalog.search("legacy thought", principal_id="assistant"), [])
+            self.assertEqual(len(catalog.search("legacy thought", trusted_local=True)), 1)
 
     def test_idempotent_grants_and_target_removal_cascade(self):
         with Catalog(self.root) as catalog:

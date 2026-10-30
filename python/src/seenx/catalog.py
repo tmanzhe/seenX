@@ -16,7 +16,7 @@ from PIL import Image, ImageOps
 from seenx.observability import count, event, stage
 from seenx.paths import LIBRARY_ROOT
 from seenx.catalog_migrations import migrate_catalog
-from seenx.catalog_access import AccessGrants
+from seenx.catalog_access import AccessDeniedError, AccessGrants, require_access_context
 
 
 SCHEMA_VERSION = 4
@@ -279,10 +279,20 @@ class Catalog:
         """).fetchall()
         return [dict(row) for row in rows]
 
-    def read_revision_bytes(self, revision_id: str) -> tuple[dict, bytes]:
+    def _authorize_asset(self, asset_id: str, principal_id: str | None, trusted_local: bool) -> None:
+        require_access_context(principal_id, trusted_local)
+        if not trusted_local and not self.access.allows(principal_id, asset_id):
+            raise AccessDeniedError("Requested memory is not granted to this caller")
+
+    def read_revision_bytes(self, revision_id: str, *, principal_id: str | None = None,
+                            trusted_local: bool = False) -> tuple[dict, bytes]:
+        require_access_context(principal_id, trusted_local)
         row = self.connection.execute("SELECT * FROM revisions WHERE id = ?", (revision_id,)).fetchone()
         if row is None:
+            if not trusted_local:
+                raise AccessDeniedError("Requested revision is not granted to this caller")
             raise LookupError("Image revision not found")
+        self._authorize_asset(row["asset_id"], principal_id, trusted_local)
         payload = self.object_path(row["sha256"]).read_bytes()
         if hashlib.sha256(payload).hexdigest() != row["sha256"]:
             raise OSError("Stored snapshot failed its content-hash check")
@@ -295,8 +305,8 @@ class Catalog:
     def search(self, query: str, match: str = "phrase", limit: int = 20,
                asset_id: str | None = None, revision_id: str | None = None,
                current_only: bool = False, *, principal_id: str | None = None,
-               trusted_local: bool | None = None) -> list:
-        """Owner-local by default; supplying a principal always selects grants."""
+               trusted_local: bool = False) -> list:
+        """Require a grant-scoped principal or explicit trusted owner access."""
         from seenx.catalog_search import search_catalog
         return search_catalog(self.connection, query, match, limit, asset_id, revision_id, current_only,
                               principal_id=principal_id, trusted_local=trusted_local)
@@ -305,7 +315,9 @@ class Catalog:
         from seenx.catalog_search import rebuild_index
         return rebuild_index(self.connection)
 
-    def get_memory(self, asset_id: str, revision_id: str | None = None) -> dict:
+    def get_memory(self, asset_id: str, revision_id: str | None = None, *,
+                   principal_id: str | None = None, trusted_local: bool = False) -> dict:
+        self._authorize_asset(asset_id, principal_id, trusted_local)
         from seenx.catalog_ocr import revision_ocr_runs
         asset = self.connection.execute("SELECT * FROM assets WHERE id = ?", (asset_id,)).fetchone()
         if asset is None:
@@ -316,7 +328,7 @@ class Catalog:
         if revision is None:
             raise LookupError("Revision not found for this memory")
         snapshot = self.object_path(revision["sha256"])
-        self.read_revision_bytes(revision_id)
+        self.read_revision_bytes(revision_id, principal_id=principal_id, trusted_local=trusted_local)
         rows = self.connection.execute("""
             SELECT n.*, g.revision_id, g.kind, g.x, g.y, g.width, g.height
             FROM annotations n JOIN regions g ON g.id = n.region_id

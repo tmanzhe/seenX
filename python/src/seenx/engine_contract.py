@@ -1,4 +1,4 @@
-"""Version-1 read-only contract with owner-bound caller access; no MCP server."""
+"""Version-1 read-only contract with owner-bound caller access."""
 
 import base64
 import hashlib
@@ -11,7 +11,7 @@ import sqlite3
 from PIL import Image, ImageOps
 
 from seenx.catalog import SCHEMA_VERSION, pixel_edge
-from seenx.catalog_access import identifier
+from seenx.catalog_access import AccessDeniedError, identifier
 from seenx.observability import count, event, run_context
 
 
@@ -96,14 +96,16 @@ class Engine:
             raise LookupError("Memory revision not found")
         if self.catalog.object_path(row["sha256"]).stat().st_size > MAX_SOURCE_BYTES:
             raise EngineError("resource_limit", "Snapshot exceeds the verification size limit")
-        memory = self.catalog.get_memory(asset_id, revision_id)
+        memory = self.catalog.get_memory(asset_id, revision_id,
+            principal_id=self.principal_id, trusted_local=self.trusted_local)
         source_name = Path(memory["asset"].pop("source_path")).name
         memory["asset"]["source_name"] = source_name
         memory["revision"].pop("snapshot_path")
         return memory
 
     def _image(self, revision_id: str, bounds: dict | None = None) -> dict:
-        revision, payload = self.catalog.read_revision_bytes(revision_id)
+        revision, payload = self.catalog.read_revision_bytes(revision_id,
+            principal_id=self.principal_id, trusted_local=self.trusted_local)
         if len(payload) > MAX_SOURCE_BYTES or revision["width"] * revision["height"] > MAX_IMAGE_PIXELS:
             raise EngineError("resource_limit", "Image exceeds the decoding size limit")
         with Image.open(BytesIO(payload)) as source:
@@ -141,9 +143,18 @@ class Engine:
             for name in ("asset_id", "revision_id"):
                 if name in params:
                     _identifier(params[name], name)
+            current_only = _boolean(params, "current_only")
+            if self.principal_id is None and not self.trusted_local:
+                # The legacy engine may start anonymously, but never reads evidence.
+                from seenx.catalog_search import match_expression
+                match_expression(params["query"], params.get("match", "phrase"))
+                limit = params.get("limit", 20)
+                if type(limit) is not int or not 1 <= limit <= 100:
+                    raise ValueError("Result limit must be between 1 and 100")
+                return []
             return self.catalog.search(params["query"], match=params.get("match", "phrase"),
                 limit=params.get("limit", 20), asset_id=params.get("asset_id"),
-                revision_id=params.get("revision_id"), current_only=_boolean(params, "current_only"),
+                revision_id=params.get("revision_id"), current_only=current_only,
                 principal_id=self.principal_id, trusted_local=self.trusted_local)
         if method == "memory.fetch":
             _fields(params, {"asset_id", "revision_id", "include_image"}, {"asset_id"})
@@ -234,6 +245,8 @@ class Engine:
                 code, message = "not_found", "Requested memory, revision, or target was not found"
             except ValueError:
                 code, message = "invalid_parameters", "Invalid query, filter, or parameter value"
+            except AccessDeniedError:
+                code, message = "access_denied", "Requested memory is not granted to this caller"
             except (OSError, Image.DecompressionBombError):
                 code, message = "evidence_unavailable", "Stored image could not be read or verified"
             except sqlite3.Error:

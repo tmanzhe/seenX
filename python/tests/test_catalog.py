@@ -37,7 +37,7 @@ class CatalogTests(unittest.TestCase):
             note = catalog.add_note(imported["revision_id"], "Keep the spacing", "Checkout",
                                     region=[0.1, 0.2, 0.3, 0.4])
         with Catalog(self.library) as catalog:
-            memory = catalog.get_memory(imported["asset_id"])
+            memory = catalog.get_memory(imported["asset_id"], trusted_local=True)
             annotation = memory["annotations"][0]
             self.assertEqual(annotation["id"], note["annotation_id"])
             self.assertEqual(annotation["note"], "Keep the spacing")
@@ -61,12 +61,12 @@ class CatalogTests(unittest.TestCase):
             changed = catalog.import_image(self.source)
             self.assertEqual(first["asset_id"], changed["asset_id"])
             self.assertNotEqual(first["revision_id"], changed["revision_id"])
-            current = catalog.get_memory(first["asset_id"])
+            current = catalog.get_memory(first["asset_id"], trusted_local=True)
             self.assertEqual(current["annotations"], [])
             self.assertEqual([item["id"] for item in current["revisions"]],
                              [first["revision_id"], changed["revision_id"]])
             self.assertEqual(current["revisions"][0]["annotation_count"], 1)
-            old = catalog.get_memory(first["asset_id"], first["revision_id"])
+            old = catalog.get_memory(first["asset_id"], first["revision_id"], trusted_local=True)
             self.assertEqual(old["annotations"][0]["note"], "Old image note")
             self.assertEqual(Path(old["revision"]["snapshot_path"]).read_bytes(), b"revision-A")
             self.source.write_bytes(b"revision-A")
@@ -78,7 +78,7 @@ class CatalogTests(unittest.TestCase):
         with Catalog(self.library) as catalog:
             imported = catalog.import_image(self.source)
             self.source.unlink()
-            memory = catalog.get_memory(imported["asset_id"])
+            memory = catalog.get_memory(imported["asset_id"], trusted_local=True)
             self.assertTrue(memory["source_missing"])
             self.assertTrue(memory["revision"]["snapshot_verified"])
 
@@ -89,26 +89,26 @@ class CatalogTests(unittest.TestCase):
             snapshot = catalog.object_path(imported["sha256"])
             snapshot.write_bytes(b"corrupt")
             with self.assertRaisesRegex(OSError, "content-hash"):
-                catalog.get_memory(imported["asset_id"])
+                catalog.get_memory(imported["asset_id"], trusted_local=True)
             with self.assertRaisesRegex(OSError, "content-hash"):
                 catalog.import_image(self.source)
             snapshot.unlink()
             with self.assertRaises(FileNotFoundError):
-                catalog.get_memory(imported["asset_id"])
+                catalog.get_memory(imported["asset_id"], trusted_local=True)
             catalog.import_image(self.source)
-            self.assertEqual(catalog.get_memory(imported["asset_id"])["annotations"][0]["note"], "Preserve this")
+            self.assertEqual(catalog.get_memory(imported["asset_id"], trusted_local=True)["annotations"][0]["note"], "Preserve this")
 
     def test_edit_and_repeatable_delete_preserve_other_records(self):
         with Catalog(self.library) as catalog:
             imported = catalog.import_image(self.source)
             note = catalog.add_note(imported["revision_id"], "Before")
             catalog.edit_note(note["annotation_id"], note="After")
-            annotation = catalog.get_memory(imported["asset_id"])["annotations"][0]
+            annotation = catalog.get_memory(imported["asset_id"], trusted_local=True)["annotations"][0]
             self.assertEqual(annotation["note"], "After")
             self.assertEqual(annotation["target"]["kind"], "whole")
             with self.assertRaises(ValueError):
                 catalog.edit_note(note["annotation_id"], note="")
-            self.assertEqual(catalog.get_memory(imported["asset_id"])["annotations"][0]["note"], "After")
+            self.assertEqual(catalog.get_memory(imported["asset_id"], trusted_local=True)["annotations"][0]["note"], "After")
             self.assertTrue(catalog.delete_note(note["annotation_id"]))
             self.assertFalse(catalog.delete_note(note["annotation_id"]))
             self.assertEqual(catalog.connection.execute("SELECT count(*) FROM regions").fetchone()[0], 0)
@@ -118,7 +118,7 @@ class CatalogTests(unittest.TestCase):
         with Catalog(self.library) as catalog:
             imported = catalog.import_image(self.source)
             catalog.add_note(imported["revision_id"], selected_text="A quote", point=[1, 1])
-            annotation = catalog.get_memory(imported["asset_id"])["annotations"][0]
+            annotation = catalog.get_memory(imported["asset_id"], trusted_local=True)["annotations"][0]
             self.assertEqual(annotation["pixel_target"], {"x": 99, "y": 199})
             self.assertEqual(annotation["origin"], "user")
             with self.assertRaises(ValueError):
@@ -147,7 +147,7 @@ class CatalogTests(unittest.TestCase):
             self.assertFalse(catalog.remove_memory(first["asset_id"]))
             self.assertEqual(catalog.connection.execute("SELECT count(*) FROM annotations").fetchone()[0], 0)
             self.assertEqual(catalog.connection.execute("PRAGMA foreign_key_check").fetchall(), [])
-            self.assertTrue(catalog.get_memory(second["asset_id"])["revision"]["snapshot_verified"])
+            self.assertTrue(catalog.get_memory(second["asset_id"], trusted_local=True)["revision"]["snapshot_verified"])
         self.assertTrue(self.source.exists())
         self.assertTrue(other.exists())
 
@@ -158,14 +158,14 @@ class CatalogTests(unittest.TestCase):
             first = catalog.import_image(self.source)
             second = catalog.import_image(other)
             with self.assertRaises(LookupError):
-                catalog.get_memory(first["asset_id"], second["revision_id"])
+                catalog.get_memory(first["asset_id"], second["revision_id"], trusted_local=True)
 
     def test_orientation_corrected_dimensions_and_source_orientation_are_recorded(self):
         self.image_open.return_value.__enter__.return_value.getexif.return_value = {274: 6}
         self.oriented.return_value.size = (200, 100)
         with Catalog(self.library) as catalog:
             imported = catalog.import_image(self.source)
-            memory = catalog.get_memory(imported["asset_id"])
+            memory = catalog.get_memory(imported["asset_id"], trusted_local=True)
             self.assertEqual((memory["revision"]["width"], memory["revision"]["height"]), (200, 100))
             self.assertEqual(memory["revision"]["exif_orientation"], 6)
 

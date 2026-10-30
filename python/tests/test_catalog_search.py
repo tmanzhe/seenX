@@ -49,7 +49,7 @@ class CatalogSearchTests(unittest.TestCase):
     def test_note_search_survives_restart_and_points_to_exact_annotation(self):
         saved = self.catalog.add_note(self.revision, "Keep this spacing", region=[0.1, 0.2, 0.3, 0.1])
         with Catalog(self.library) as reopened:
-            results = reopened.search("keep this spacing")
+            results = reopened.search("keep this spacing", trusted_local=True)
         self.assertEqual(len(results), 1)
         result = results[0]
         self.assertEqual(result["annotation_id"], saved["annotation_id"])
@@ -65,7 +65,7 @@ class CatalogSearchTests(unittest.TestCase):
     def test_selected_text_and_ocr_keep_separate_evidence_and_provenance(self):
         observation = self.add_ocr()
         saved = self.catalog.add_note(self.revision, "This button", observation_id=observation["id"])
-        results = self.catalog.search("continue to checkout")
+        results = self.catalog.search("continue to checkout", trusted_local=True)
         self.assertEqual({result["matched_field"] for result in results}, {"selected_text", "ocr"})
         self.assertTrue(all(result["observation_id"] == observation["id"] for result in results))
         self.assertTrue(all(result["provenance"]["confirmation"] == "unverified" for result in results))
@@ -73,25 +73,25 @@ class CatalogSearchTests(unittest.TestCase):
 
     def test_edits_remove_old_terms_and_deletion_removes_all_annotation_hits(self):
         note = self.catalog.add_note(self.revision, "Original wording", "Selected phrase")
-        self.assertEqual(len(self.catalog.search("original wording")), 1)
+        self.assertEqual(len(self.catalog.search("original wording", trusted_local=True)), 1)
         self.catalog.edit_note(note["annotation_id"], note="Replacement wording")
-        self.assertEqual(self.catalog.search("original wording"), [])
-        self.assertEqual(len(self.catalog.search("replacement wording")), 1)
-        self.assertEqual(len(self.catalog.search("selected phrase")), 1)
+        self.assertEqual(self.catalog.search("original wording", trusted_local=True), [])
+        self.assertEqual(len(self.catalog.search("replacement wording", trusted_local=True)), 1)
+        self.assertEqual(len(self.catalog.search("selected phrase", trusted_local=True)), 1)
         self.catalog.edit_note(note["annotation_id"], selected_text="New quotation")
-        self.assertEqual(self.catalog.search("selected phrase"), [])
-        self.assertEqual(len(self.catalog.search("new quotation")), 1)
+        self.assertEqual(self.catalog.search("selected phrase", trusted_local=True), [])
+        self.assertEqual(len(self.catalog.search("new quotation", trusted_local=True)), 1)
         self.catalog.delete_note(note["annotation_id"])
-        self.assertEqual(self.catalog.search("replacement wording"), [])
-        self.assertEqual(self.catalog.search("new quotation"), [])
+        self.assertEqual(self.catalog.search("replacement wording", trusted_local=True), [])
+        self.assertEqual(self.catalog.search("new quotation", trusted_local=True), [])
         self.assert_index_consistent()
 
     def test_corrected_selection_does_not_rewrite_ocr_evidence(self):
         observation = self.add_ocr("Model spelling")
         note = self.catalog.add_note(self.revision, observation_id=observation["id"])
         self.catalog.edit_note(note["annotation_id"], selected_text="Corrected spelling")
-        old = self.catalog.search("model spelling")
-        new = self.catalog.search("corrected spelling")
+        old = self.catalog.search("model spelling", trusted_local=True)
+        new = self.catalog.search("corrected spelling", trusted_local=True)
         self.assertEqual([result["matched_field"] for result in old], ["ocr"])
         self.assertEqual(new[0]["provenance"], {"origin": "user", "confirmation": "confirmed"})
         self.assertIsNone(new[0]["observation_id"])
@@ -104,7 +104,7 @@ class CatalogSearchTests(unittest.TestCase):
         other = self.import_source(other_source)
         self.catalog.add_note(other["revision_id"], "Shared evidence")
         self.catalog.remove_memory(self.imported["asset_id"])
-        results = self.catalog.search("shared evidence")
+        results = self.catalog.search("shared evidence", trusted_local=True)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0]["asset_id"], other["asset_id"])
         self.assert_index_consistent()
@@ -115,44 +115,44 @@ class CatalogSearchTests(unittest.TestCase):
             WHEN NEW.content = 'Replacement text' BEGIN SELECT RAISE(ABORT, 'injected indexing failure'); END""")
         with self.assertRaises(sqlite3.IntegrityError):
             self.catalog.edit_note(note["annotation_id"], note="Replacement text")
-        self.assertEqual(len(self.catalog.search("original text")), 1)
-        self.assertEqual(self.catalog.search("replacement text"), [])
-        self.assertEqual(self.catalog.get_memory(self.imported["asset_id"])["annotations"][0]["note"], "Original text")
+        self.assertEqual(len(self.catalog.search("original text", trusted_local=True)), 1)
+        self.assertEqual(self.catalog.search("replacement text", trusted_local=True), [])
+        self.assertEqual(self.catalog.get_memory(self.imported["asset_id"], trusted_local=True)["annotations"][0]["note"], "Original text")
         self.assert_index_consistent()
 
     def test_phrase_all_terms_unicode_and_token_boundaries(self):
         self.catalog.add_note(self.revision, "Keep this spacing in Montréal café; connection-refused; testing")
-        self.assertEqual(self.catalog.search("keep spacing"), [])
-        self.assertEqual(len(self.catalog.search("spacing keep", match="all")), 1)
-        self.assertEqual(len(self.catalog.search("MONTREAL CAFE")), 1)
-        self.assertEqual(len(self.catalog.search("connection refused")), 1)
-        self.assertEqual(self.catalog.search("test"), [])
-        self.assertEqual(self.catalog.search("spacing*extra"), [])
+        self.assertEqual(self.catalog.search("keep spacing", trusted_local=True), [])
+        self.assertEqual(len(self.catalog.search("spacing keep", match="all", trusted_local=True)), 1)
+        self.assertEqual(len(self.catalog.search("MONTREAL CAFE", trusted_local=True)), 1)
+        self.assertEqual(len(self.catalog.search("connection refused", trusted_local=True)), 1)
+        self.assertEqual(self.catalog.search("test", trusted_local=True), [])
+        self.assertEqual(self.catalog.search("spacing*extra", trusted_local=True), [])
 
     def test_operator_characters_are_literal_not_query_language(self):
         self.catalog.add_note(self.revision, "Cats", "Dogs")
         for query in ('cats OR dogs', 'cats" OR "dogs', "x'; DROP TABLE annotations; --"):
             with self.subTest(query=query):
-                self.assertEqual(self.catalog.search(query), [])
-        self.assertEqual(len(self.catalog.search("cats")), 1)
+                self.assertEqual(self.catalog.search(query, trusted_local=True), [])
+        self.assertEqual(len(self.catalog.search("cats", trusted_local=True)), 1)
 
     def test_history_is_searchable_with_explicit_current_and_id_filters(self):
         self.catalog.add_note(self.revision, "Historic thought")
         self.source.write_bytes(b"changed image bytes")
         current = self.import_source(self.source)
-        result = self.catalog.search("historic thought")[0]
+        result = self.catalog.search("historic thought", trusted_local=True)[0]
         self.assertFalse(result["is_current_revision"])
-        self.assertEqual(self.catalog.search("historic thought", current_only=True), [])
-        self.assertEqual(self.catalog.search("historic thought", revision_id=current["revision_id"]), [])
-        self.assertEqual(len(self.catalog.search("historic thought", revision_id=self.revision)), 1)
-        self.assertEqual(self.catalog.search("historic thought", asset_id="other"), [])
+        self.assertEqual(self.catalog.search("historic thought", current_only=True, trusted_local=True), [])
+        self.assertEqual(self.catalog.search("historic thought", revision_id=current["revision_id"], trusted_local=True), [])
+        self.assertEqual(len(self.catalog.search("historic thought", revision_id=self.revision, trusted_local=True)), 1)
+        self.assertEqual(self.catalog.search("historic thought", asset_id="other", trusted_local=True), [])
 
     def test_rebuild_preserves_sources_results_and_stable_ids(self):
         self.catalog.add_note(self.revision, "Keep this spacing", "Selected text")
         self.add_ocr()
-        before = self.catalog.search("spacing")
+        before = self.catalog.search("spacing", trusted_local=True)
         self.assertEqual(self.catalog.rebuild_search(), 3)
-        self.assertEqual(self.catalog.search("spacing"), before)
+        self.assertEqual(self.catalog.search("spacing", trusted_local=True), before)
         self.assertEqual(self.catalog.rebuild_search(), 3)
         self.assert_index_consistent()
 
@@ -160,19 +160,19 @@ class CatalogSearchTests(unittest.TestCase):
         with self.catalog.connection:
             self.catalog.connection.execute("""INSERT INTO search_documents(kind, source_id, revision_id, content)
                 VALUES ('note', 'missing-annotation', ?, 'Ghost evidence')""", (self.revision,))
-        self.assertEqual(self.catalog.search("ghost evidence"), [])
+        self.assertEqual(self.catalog.search("ghost evidence", trusted_local=True), [])
         self.assertEqual(self.catalog.rebuild_search(), 0)
 
     def test_bounded_inputs_and_normal_no_match(self):
         self.catalog.add_note(self.revision, "Keep this spacing")
         self.catalog.add_note(self.revision, "Keep this spacing too")
-        self.assertEqual(len(self.catalog.search("spacing", limit=1)), 1)
-        self.assertEqual(self.catalog.search("submarine"), [])
+        self.assertEqual(len(self.catalog.search("spacing", limit=1, trusted_local=True)), 1)
+        self.assertEqual(self.catalog.search("submarine", trusted_local=True), [])
         for query, options in ((" ", {}), ("!!!", {}), ("x" * 513, {}),
                                ("word " * 33, {"match": "all"}), ("x", {"limit": 0}),
                                ("x", {"limit": 101}), ("x", {"match": "raw"})):
             with self.subTest(query=query, options=options), self.assertRaises(ValueError):
-                self.catalog.search(query, **options)
+                self.catalog.search(query, trusted_local=True, **options)
 
 
 class SearchMigrationTests(unittest.TestCase):
@@ -202,12 +202,12 @@ class SearchMigrationTests(unittest.TestCase):
     def test_existing_version_two_sources_are_backfilled_without_id_changes(self):
         with Catalog(self.root) as catalog:
             self.assertEqual(catalog.connection.execute("PRAGMA user_version").fetchone()[0], SCHEMA_VERSION)
-            self.assertEqual(catalog.search("legacy thought")[0]["annotation_id"], "note")
-            self.assertEqual(catalog.search("selected quotation")[0]["matched_field"], "selected_text")
-            self.assertEqual(catalog.search("recognized evidence")[0]["observation_id"], "observation")
-            self.assertEqual(catalog.get_memory("asset")["annotations"][0]["created_at"], "old-time")
+            self.assertEqual(catalog.search("legacy thought", trusted_local=True)[0]["annotation_id"], "note")
+            self.assertEqual(catalog.search("selected quotation", trusted_local=True)[0]["matched_field"], "selected_text")
+            self.assertEqual(catalog.search("recognized evidence", trusted_local=True)[0]["observation_id"], "observation")
+            self.assertEqual(catalog.get_memory("asset", trusted_local=True)["annotations"][0]["created_at"], "old-time")
         with Catalog(self.root) as catalog:
-            self.assertEqual(len(catalog.search("legacy thought")), 1)
+            self.assertEqual(len(catalog.search("legacy thought", trusted_local=True)), 1)
 
     def test_failed_fts_migration_rolls_back_and_can_be_retried(self):
         with patch("seenx.catalog_migrations.V3_STATEMENTS", (*V3_STATEMENTS[:5], "INVALID SQL")):
@@ -218,7 +218,7 @@ class SearchMigrationTests(unittest.TestCase):
             self.assertIsNone(connection.execute("SELECT name FROM sqlite_master WHERE name = 'search_documents'").fetchone())
             self.assertEqual(connection.execute("SELECT note FROM annotations").fetchone()[0], "Legacy thought")
         with Catalog(self.root) as catalog:
-            self.assertEqual(len(catalog.search("legacy thought")), 1)
+            self.assertEqual(len(catalog.search("legacy thought", trusted_local=True)), 1)
 
     def test_all_pending_upgrades_roll_back_together_from_version_one(self):
         old = self.root / "version-one"

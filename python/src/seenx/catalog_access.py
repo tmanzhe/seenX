@@ -56,6 +56,21 @@ def grant_filter(principal_id: str | None) -> tuple[str, tuple]:
     ))""", (principal_id, principal_id)
 
 
+class AccessDeniedError(PermissionError):
+    """A grant denial, distinct from an OS-level file permission failure."""
+
+
+def require_access_context(principal_id: str | None, trusted_local: bool) -> None:
+    """In-process evidence reads must deliberately choose their access scope."""
+    if type(trusted_local) is not bool or (trusted_local and principal_id is not None):
+        raise ValueError("Choose either a grant-scoped principal or trusted local access")
+    if principal_id is None:
+        if not trusted_local:
+            raise ValueError("Evidence reads require principal_id or trusted_local=True")
+    else:
+        identifier(principal_id)
+
+
 class AccessGrants:
     """Trusted catalog-owner API. Never exposed as an engine wire method."""
 

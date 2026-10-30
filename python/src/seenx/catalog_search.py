@@ -1,7 +1,7 @@
 """Bounded FTS5 retrieval returning references to durable source evidence."""
 
 from seenx.catalog_search_schema import DOCUMENT_SELECT
-from seenx.catalog_access import grant_filter
+from seenx.catalog_access import grant_filter, require_access_context
 from seenx.observability import count, event, stage
 
 
@@ -22,11 +22,8 @@ def match_expression(query: str, mode: str) -> str:
 def search_catalog(connection, query: str, match: str = "phrase", limit: int = 20,
                    asset_id: str | None = None, revision_id: str | None = None,
                    current_only: bool = False, *, principal_id: str | None = None,
-                   trusted_local: bool | None = None) -> list:
-    if trusted_local is None:
-        trusted_local = principal_id is None
-    if type(trusted_local) is not bool or (trusted_local and principal_id is not None):
-        raise ValueError("Choose either a grant-scoped principal or trusted local access")
+                   trusted_local: bool = False) -> list:
+    require_access_context(principal_id, trusted_local)
     expression = match_expression(query, match)
     if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 100:
         raise ValueError("Result limit must be between 1 and 100")

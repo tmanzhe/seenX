@@ -70,6 +70,49 @@ class EngineFixture(unittest.TestCase):
         return json.loads(self.engine.handle(self.frame(method, params, **overrides)))
 
 
+class CatalogReadAccessTests(EngineFixture):
+    def test_ungranted_direct_fetches_refuse_before_snapshot_reads(self):
+        with patch.object(self.catalog, "object_path") as snapshot:
+            for principal_id in ("assistant-a", "assistant-b"):
+                with self.assertRaises(PermissionError):
+                    self.catalog.get_memory(self.imported["asset_id"], principal_id=principal_id)
+                with self.assertRaises(PermissionError):
+                    self.catalog.read_revision_bytes(self.imported["revision_id"], principal_id=principal_id)
+            with self.assertRaises(PermissionError):
+                self.catalog.get_memory("unknown", principal_id="assistant-a")
+            with self.assertRaises(PermissionError):
+                self.catalog.read_revision_bytes("unknown", principal_id="assistant-a")
+            snapshot.assert_not_called()
+
+    def test_direct_fetches_apply_source_and_collection_grants_and_revocation(self):
+        for scope in ("source", "collection"):
+            with self.subTest(scope=scope):
+                target = self.imported["asset_id"]
+                if scope == "collection":
+                    target = self.catalog.access.create_collection("Shared")
+                    self.catalog.access.add_member(target, self.imported["asset_id"])
+                getattr(self.catalog.access, f"grant_{scope}")("assistant-a", target)
+                self.assertEqual(len(self.catalog.search("spacing", principal_id="assistant-a")), 1)
+                memory = self.catalog.get_memory(self.imported["asset_id"], principal_id="assistant-a")
+                self.assertEqual(memory["annotations"][0]["id"], self.note["annotation_id"])
+                _, payload = self.catalog.read_revision_bytes(self.imported["revision_id"], principal_id="assistant-a")
+                self.assertEqual(payload, b"placeholder")
+                with self.assertRaises(PermissionError):
+                    self.catalog.get_memory(self.imported["asset_id"], principal_id="assistant-b")
+                getattr(self.catalog.access, f"revoke_{scope}")("assistant-a", target)
+                self.assertEqual(self.catalog.search("spacing", principal_id="assistant-a"), [])
+                with self.assertRaises(PermissionError):
+                    self.catalog.get_memory(self.imported["asset_id"], principal_id="assistant-a")
+                with self.assertRaises(PermissionError):
+                    self.catalog.read_revision_bytes(self.imported["revision_id"], principal_id="assistant-a")
+
+    def test_explicit_trusted_reads_retain_owner_access(self):
+        memory = self.catalog.get_memory(self.imported["asset_id"], trusted_local=True)
+        self.assertEqual(memory["annotations"][0]["id"], self.note["annotation_id"])
+        _, payload = self.catalog.read_revision_bytes(self.imported["revision_id"], trusted_local=True)
+        self.assertEqual(payload, b"placeholder")
+
+
 class EngineContractTests(EngineFixture):
     def test_info_and_search_have_stable_ids_and_trace_correlation(self):
         info = self.request()
@@ -187,6 +230,7 @@ class EngineContractTests(EngineFixture):
 
     def test_storage_and_unexpected_errors_do_not_expose_exception_messages(self):
         for error, expected in ((OSError("private-path-sentinel"), "evidence_unavailable"),
+                                (PermissionError("private-path-sentinel"), "evidence_unavailable"),
                                 (sqlite3.OperationalError("private-path-sentinel"), "storage_error"),
                                 (RuntimeError("private-path-sentinel"), "internal_error")):
             with self.subTest(error=type(error).__name__), patch.object(self.catalog, "get_memory", side_effect=error):
