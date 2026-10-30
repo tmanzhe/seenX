@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "name": "practice-images metadata-only starter",
+  "status": "starter",
+  "description": "Provisional starter based only on committed documentation. The ignored practice-images folder is absent from this checkout. No image filenames, OCR text, region IDs, or note judgments have been invented. Revalidate the no-match judgment against the actual collection before treating it as ground truth.",
+  "queries": [
+    {
+      "id": "submarine-no-match",
+      "query": "a submarine underwater",
+      "relevant_ids": [],
+      "evidence": "python/README.md, How we're checking accuracy, describes the submarine query as unrelated to the practice collection. python/docs/walkthrough.md, section 9, records this exact query and zero accepted results. This is a provisional historical no-match label, not a fresh inspection or proof derived from the score cutoff."
+    }
+  ],
+  "pending_queries": [
+    {
+      "query": "basketball",
+      "reason": "python/docs/walkthrough.md section 9 says the best image was visually checked. Its filename/ID is not recorded; inspect the real practice-images folder and assign relevant_ids before scoring."
+    },
+    {
+      "query": "a laptop",
+      "reason": "python/docs/walkthrough.md section 9 describes one relevant laptop image and a visual check, but gives no filename/ID. Inspect the real practice-images folder and assign relevant_ids before scoring."
+    }
+  ]
+}
