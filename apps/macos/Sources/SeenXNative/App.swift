@@ -28,6 +28,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var onboardingPanel: FloatingPanel?
     private var editorPanel: FloatingPanel?
     private var engineBrowser: EngineBrowserController?
+    private let launcherCatalog = EngineBrowserModel()
     private var session: AnnotationSession?
     private let shortcuts = GlobalHotKeys()
     private var eventMonitor: Any?
@@ -36,6 +37,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var libraryObservation: AnyCancellable?
     private var navigationObservation: AnyCancellable?
     private let navigation = LauncherNavigation()
+    private var launcherResultCount = 3
     private var libraryStatus: NSMenuItem?
     private var opacity: Double = UserDefaults.standard.object(forKey: "glassBackgroundOpacity") as? Double ?? 0.55
     private var permissionDenied = false
@@ -53,7 +55,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         libraryObservation = store.$captures.sink { [weak self] items in
             self?.libraryStatus?.title = "\(items.count) saved screenshot\(items.count == 1 ? "" : "s")"
             self?.statusItem.button?.toolTip = "seenX · \(items.count) saved screenshots"
-            self?.resizeSearch(for: items.count)
         }
         navigationObservation = navigation.$screen.sink { [weak self] screen in self?.resizeLauncher(for: screen) }
         shortcuts.action = { [weak self] id in
@@ -298,7 +299,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 capture: { [weak self] in self?.beginCapture(annotate: $0) },
                 openLibrary: { [weak self] in self?.showLibrary() }, navigation: navigation,
                 quitApp: { [weak self] in self?.quitAction() },
-                restartApp: { [weak self] in self?.restartApplication() }))
+                restartApp: { [weak self] in self?.restartApplication() },
+                catalog: launcherCatalog,
+                resultsChanged: { [weak self] in self?.resizeSearch(for: $0) }))
         }
         NSApp.activate(ignoringOtherApps: true)
         searchPanel?.makeKeyAndOrderFront(nil)
@@ -326,9 +329,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         panel.setFrame(direction.moving(panel.frame, inside: display.visibleFrame), display: true)
     }
 
-    private func searchHeight(for count: Int) -> CGFloat { CGFloat(112 + (count == 0 ? 3 : min(count, 5)) * 52) }
+    private func searchHeight(for count: Int) -> CGFloat { CGFloat(142 + (count == 0 ? 3 : min(count, 5)) * 52) }
 
     private func resizeSearch(for count: Int) {
+        launcherResultCount = count
         guard navigation.screen == .search else { return }
         resizeLauncher(for: .search, count: count)
     }
@@ -338,8 +342,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         var frame = panel.frame
         let top = frame.maxY
         switch screen {
-        case .search: frame.size.height = searchHeight(for: count ?? store.captures.count)
-        case .library, .detail: frame.size.height = 500
+        case .search: frame.size.height = searchHeight(for: count ?? launcherResultCount)
+        case .library, .detail, .catalogDetail: frame.size.height = 500
         }
         if let display = panel.screen ?? NSScreen.main { frame.size.height = min(frame.height, display.visibleFrame.height - 48) }
         frame.origin.y = top - frame.height

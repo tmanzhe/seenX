@@ -1,4 +1,5 @@
 import AppKit
+import SeenXEngineClient
 import SwiftUI
 
 enum LauncherAction: String, CaseIterable, Identifiable {
@@ -39,15 +40,18 @@ enum LauncherAction: String, CaseIterable, Identifiable {
 
 private enum LauncherRow: Identifiable {
     case saved(SavedCapture)
+    case catalog(SearchHit)
     case action(LauncherAction)
     var id: String {
         switch self {
         case .saved(let capture): return capture.id.uuidString
+        case .catalog(let hit): return "catalog:\(hit.id)"
         case .action(let action): return action.id
         }
     }
 }
 
+@MainActor
 struct SearchView: View {
     @ObservedObject var store: CaptureStore
     @State var opacity: Double
@@ -57,6 +61,8 @@ struct SearchView: View {
     @ObservedObject var navigation: LauncherNavigation
     var quitApp: (() -> Void)? = nil
     var restartApp: (() -> Void)? = nil
+    @ObservedObject var catalog = EngineBrowserModel()
+    var resultsChanged: ((Int) -> Void)? = nil
     @Environment(\.colorScheme) private var scheme
     @State private var focusToken = 0
     private var theme: SeenXTheme { SeenXTheme(scheme: scheme) }
@@ -66,12 +72,14 @@ struct SearchView: View {
     private var rows: [LauncherRow] {
         let saved = Array(store.results(for: navigation.query).prefix(5)).map(LauncherRow.saved)
         if navigation.query.isEmpty { return saved.isEmpty ? LauncherAction.allCases.map(LauncherRow.action) : saved }
-        return saved + LauncherAction.allCases.filter { $0.matches(navigation.query) }.map(LauncherRow.action)
+        let evidence = catalog.query == navigation.query ? Array(catalog.hits.prefix(5)).map(LauncherRow.catalog) : []
+        return evidence + saved + LauncherAction.allCases.filter { $0.matches(navigation.query) }.map(LauncherRow.action)
     }
     private var libraryResults: [SavedCapture] { store.results(for: navigation.query) }
     private var selectedCapture: SavedCapture? {
         switch navigation.screen {
         case .detail(let item): return item
+        case .catalogDetail: return nil
         case .library:
             return libraryResults.indices.contains(navigation.selectedIndex) ? libraryResults[navigation.selectedIndex] : nil
         case .search:
@@ -84,28 +92,45 @@ struct SearchView: View {
         VStack(spacing: 0) {
             header
             switch navigation.screen {
-            case .search: searchResults
+            case .search:
+                catalogStatus
+                searchResults
             case .library:
                 InlineLibraryGrid(store: store, results: libraryResults, selectedIndex: $navigation.selectedIndex,
                                   open: { navigation.open($0) })
             case .detail(let item): CapturePreviewContent(capture: item, url: store.imageURL(for: item))
+            case .catalogDetail:
+                catalogStatus
+                EngineEvidenceDetail(model: catalog)
             }
             Rectangle().fill(theme.border.opacity(0.35)).frame(height: 1)
             footer
         }
         .frame(minWidth: 520, minHeight: 148).foregroundStyle(theme.primary).tint(theme.accent).seenXGlass(opacity: opacity)
-        .task { focusToken += 1 }
+        .task { focusToken += 1; resultsChanged?(rows.count) }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("seenX.focusSearch"))) { notification in
             guard notification.object as? String == "search" else { return }
             if case .detail = navigation.screen { navigation.back() }
+            if case .catalogDetail = navigation.screen { navigation.back() }
             focusToken += 1
         }
         .onChange(of: navigation.screen) { _, screen in
             if case .detail = screen { return }
+            if case .catalogDetail = screen { return }
+            if screen == .search { resultsChanged?(rows.count) }
             focusToken += 1
         }
+        .onChange(of: navigation.query) { _, value in
+            if navigation.screen == .search { catalog.updateSearchQuery(value) }
+        }
+        .onChange(of: catalog.connected) { _, connected in
+            if connected, navigation.screen == .search { catalog.updateSearchQuery(navigation.query) }
+        }
         .onChange(of: rows.map(\.id)) { _, _ in
-            if navigation.screen == .search { navigation.selectedIndex = min(navigation.selectedIndex, max(0, rows.count - 1)) }
+            if navigation.screen == .search {
+                navigation.selectedIndex = min(navigation.selectedIndex, max(0, rows.count - 1))
+                resultsChanged?(rows.count)
+            }
         }
     }
 
@@ -122,6 +147,9 @@ struct SearchView: View {
                 Spacer()
                 Text(item.createdAt.formatted(date: .abbreviated, time: .shortened))
                     .font(.system(size: 10)).foregroundStyle(theme.secondary)
+            } else if case .catalogDetail = navigation.screen {
+                Text(catalog.memory?.asset.sourceName ?? "Catalog evidence").font(.system(size: 14, weight: .medium)).lineLimit(1)
+                Spacer()
             } else {
                 SearchInput(text: query, placeholder: navigation.screen == .library ? "Search library…" : "Search screenshots or commands…",
                             focusToken: focusToken, fontSize: 16, move: moveSelection, submit: runSelected)
@@ -134,12 +162,30 @@ struct SearchView: View {
         }.padding(.horizontal, 20).frame(height: 56)
     }
 
+    private var catalogStatus: some View {
+        HStack(spacing: 8) {
+            if catalog.busy { ProgressView().controlSize(.mini) }
+            Text(catalog.error ?? (catalog.connected
+                ? (navigation.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    ? "Catalog connected · type words to search saved evidence"
+                    : (catalog.searched && !catalog.busy && catalog.hits.isEmpty ? "No matching catalog evidence" : "Catalog · lexical search"))
+                : "Catalog disconnected · native captures remain available"))
+                .foregroundStyle(catalog.error == nil ? theme.secondary : .red).lineLimit(1)
+                .help(catalog.error ?? "Catalog results are separate from native captures.")
+            Spacer(minLength: 0)
+            Button(catalog.connected ? "Change…" : "Connect catalog…") {
+                catalog.chooseLibrary()
+            }.buttonStyle(.plain).disabled(catalog.busy).foregroundStyle(theme.accent)
+        }.font(.system(size: 10)).padding(.horizontal, 20).frame(height: 30)
+    }
+
     private var searchResults: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 if rows.isEmpty {
                     VStack(spacing: 8) {
-                        Text("No matching screenshots.").font(.system(size: 14, weight: .medium))
+                        Text(catalog.connected && (catalog.busy || !catalog.searched)
+                             ? "Searching saved evidence…" : "No matching screenshots.").font(.system(size: 14, weight: .medium))
                         Text("Try another word, or type Capture to save something new.")
                             .font(.system(size: 12)).foregroundStyle(theme.secondary)
                     }.frame(maxWidth: .infinity).padding(.vertical, 32)
@@ -150,6 +196,8 @@ struct SearchView: View {
                                 switch row {
                                 case .saved(let item):
                                     SearchResultRow(capture: item, url: store.imageURL(for: item), selected: index == navigation.selectedIndex)
+                                case .catalog(let hit):
+                                    CatalogResultRow(hit: hit, selected: index == navigation.selectedIndex)
                                 case .action(let action): LauncherActionRow(action: action, selected: index == navigation.selectedIndex)
                                 }
                             }.buttonStyle(.plain).onHover { if $0 { navigation.selectedIndex = index } }.id(index)
@@ -194,6 +242,18 @@ struct SearchView: View {
                     .buttonStyle(.plain).padding(8)
             }
             Divider().padding(.vertical, 4)
+            Button(catalog.connected ? "Change Catalog…" : "Connect Catalog…") {
+                navigation.actionsPresented = false
+                catalog.chooseLibrary()
+            }.buttonStyle(.plain).padding(8).disabled(catalog.busy)
+            if catalog.connected {
+                Button("Disconnect Catalog") {
+                    navigation.actionsPresented = false
+                    catalog.disconnect()
+                    if case .catalogDetail = navigation.screen { navigation.back() }
+                }.buttonStyle(.plain).padding(8)
+            }
+            Divider().padding(.vertical, 4)
             HStack {
                 Text("Glass opacity").font(.system(size: 11)).foregroundStyle(theme.secondary)
                 Spacer()
@@ -228,8 +288,12 @@ struct SearchView: View {
     private var canRun: Bool {
         switch navigation.screen {
         case .detail: return true
+        case .catalogDetail: return false
         case .library: return selectedCapture != nil
-        case .search: return rows.indices.contains(navigation.selectedIndex)
+        case .search:
+            guard rows.indices.contains(navigation.selectedIndex) else { return false }
+            if case .catalog = rows[navigation.selectedIndex] { return catalog.connected && !catalog.busy }
+            return true
         }
     }
     private var primaryTitle: String {
@@ -244,10 +308,15 @@ struct SearchView: View {
     }
     private func runSelected() {
         if case .detail(let item) = navigation.screen { NSWorkspace.shared.open(store.imageURL(for: item)); return }
+        if case .catalogDetail = navigation.screen { return }
         if navigation.screen == .library { if let item = selectedCapture { navigation.open(item) }; return }
         guard rows.indices.contains(navigation.selectedIndex) else { return }
         switch rows[navigation.selectedIndex] {
         case .saved(let item): navigation.open(item)
+        case .catalog(let hit):
+            guard catalog.connected, !catalog.busy else { return }
+            catalog.open(hit)
+            navigation.openCatalogHit(id: hit.id)
         case .action(let action): perform(action)
         }
     }
@@ -257,6 +326,28 @@ struct SearchView: View {
         case .annotate: capture(true)
         case .library: navigation.showLibrary()
         }
+    }
+}
+
+private struct CatalogResultRow: View {
+    let hit: SearchHit
+    let selected: Bool
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        let theme = SeenXTheme(scheme: scheme)
+        HStack(spacing: 12) {
+            Image(systemName: "text.magnifyingglass").foregroundStyle(theme.accent).frame(width: 36, height: 36)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(hit.excerpt).font(.system(size: 13, weight: .medium)).lineLimit(1)
+                Text("Catalog · \(hit.matchedField) · \(hit.provenance.origin) · \(hit.provenance.confirmation)\(hit.isCurrentRevision ? "" : " · Earlier revision")")
+                    .font(.system(size: 10)).foregroundStyle(theme.secondary).lineLimit(1)
+            }
+            Spacer(minLength: 8)
+        }.foregroundStyle(theme.primary).padding(.horizontal, 12).frame(height: 52)
+            .background(selected ? theme.panel.opacity(0.18) : .clear, in: RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(selected ? theme.border.opacity(0.65) : .clear, lineWidth: 1))
+            .contentShape(Rectangle())
     }
 }
 
