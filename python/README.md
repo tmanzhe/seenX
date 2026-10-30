@@ -10,6 +10,14 @@ The catalog saves OCR text regions and lets notes quote their stable observation
 
 The next slice gives other local programs a consistent way to ask this catalog questions. `seenx-engine` accepts versioned JSON requests for search, memory fetch, and saved-region fetch. It can return existing image pixels in memory; it doesn't create picture files. Read [the engine-interface lesson](docs/engine-contract.md) for the format and limits. The native app now offers an optional **Open Python Library…** browser using this contract; [the native integration lesson](../docs/native-engine.md) explains setup. Capture storage and the main native launcher still use their separate development library.
 
+The optional read-only MCP server uses the same contract and requires an owner-configured grant principal:
+
+```sh
+uv run --project python --extra mcp seenx-mcp --library /path/to/library --principal assistant-a
+```
+
+It exposes exactly `search` and `fetch` over stdio. See the [MCP client config and grants](docs/engine-contract.md#read-only-mcp-over-stdio). In-process catalog evidence reads also require `principal_id` or explicit `trusted_local=True`.
+
 ## Start here: uv manages the environment
 
 From the repository root:
@@ -31,9 +39,11 @@ uv run --project python seenx-visual practice-images --query "a photo of a lapto
 
 Later model loads use local files unless downloads are requested. Your photos and documents aren't uploaded. `practice-images/` is the repository-root input folder, ignored by Git; another existing folder path works too.
 
-`--all-extras` installs the optional `ocr` and `visual` groups. OCR currently requires macOS. For PDF text-only work, plain `uv sync --project python` installs the base project. A later plain sync removes unselected extras, so use `--all-extras` for the full toolkit. `uv run` normally preserves already-installed extras. See [uv's sync behavior](https://docs.astral.sh/uv/concepts/projects/sync/).
+`--all-extras` installs the optional `ocr`, `visual`, and `mcp` groups. OCR currently requires macOS. For PDF text-only work, plain `uv sync --project python` installs the base project. A later plain sync removes unselected extras, so use `--all-extras` for the full toolkit. `uv run` normally preserves already-installed extras. See [uv's sync behavior](https://docs.astral.sh/uv/concepts/projects/sync/).
 
 The committed lockfile records exact dependency versions. Use `uv sync --project python --all-extras --locked` to require it to stay unchanged. We commit that file, not the generated virtual environment.
+
+The new MCP extra has not been resolved into the lockfile in this code-only change. An unlocked `uv sync` or the MCP command above must refresh it before `--locked` can be used with the updated project.
 
 ## Commands you'll use
 

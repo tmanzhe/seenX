@@ -2,14 +2,14 @@
 
 We now have a versioned read-only interface over the Python catalog. A local client can launch `seenx-engine`, send JSON requests on stdin, and read JSON responses on stdout. The process keeps one catalog connection open and handles requests sequentially until stdin closes.
 
-This is the first internal app integration boundary. The native app's optional **Open Python Library…** browser now uses it through [SeenXEngineClient](../../packages/SeenXEngineClient); see [the native integration lesson](../../docs/native-engine.md). Its main capture launcher/library remain separate. This isn't an HTTP endpoint, an MCP server, or a JSON-RPC implementation. There are no new Python dependencies, network listeners, or model downloads. Keeping the retrieval functions behind this boundary lets a later transport or native implementation preserve the same behavior.
+This is the first internal app integration boundary. The native app's optional **Open Python Library…** browser now uses it through [SeenXEngineClient](../../packages/SeenXEngineClient); see [the native integration lesson](../../docs/native-engine.md). Its main capture launcher/library remain separate. `seenx-engine` uses its own JSON-line protocol; the optional `seenx-mcp` adapter below supplies MCP JSON-RPC over stdio using the same version-1 search/fetch contract. Neither opens a network listener or downloads models.
 
 ## Start with a handshake
 
 From the repository root:
 
 ```sh
-uv sync --project python --all-extras --locked
+uv sync --project python --all-extras
 printf '%s\n' '{"version":1,"id":"hello","method":"engine.info","params":{}}' \
   | uv run --project python seenx-engine --no-log
 ```
@@ -50,11 +50,38 @@ seenx-memory --library /path/to/library revoke assistant-a --collection COLLECTI
 
 Currently a **source is one imported file**, identified by its stable asset ID across all revisions; this is distinct from FTS's internal annotation/observation `source_id`. Folder/app/URL source groups are not implemented. A source grant **or** membership in a granted collection permits the whole asset, including historical revisions and annotations. Collection membership is live: `collection-add` authorizes new members and `collection-remove` removes that route to access. Revoking one grant leaves any other matching grant effective. Removing an asset cascades its source grants and memberships.
 
-The version-1 engine applies the same grant predicate to search candidates **before LIMIT** and to both fetch methods before reading evidence. An ungranted asset (including an unknown ID) returns `access_denied`; search silently excludes ungranted hits, even with explicit asset/revision filters. Grants are re-read on every request, so committed revocation affects subsequent calls in an existing session. The existing single-owner/sequential-request assumption remains; in-flight disclosures cannot be recalled. Direct `Catalog` reads and `seenx-memory search/get` are trusted owner APIs; supplying `principal_id` to `Catalog.search` selects grant filtering automatically.
+The version-1 engine applies the same grant predicate to search candidates **before LIMIT** and to both fetch methods before reading evidence. An ungranted asset (including an unknown ID) returns `access_denied`; search silently excludes ungranted hits, even with explicit asset/revision filters. Grants are re-read on every request, so committed revocation affects subsequent calls in an existing session. The existing single-owner/sequential-request assumption remains; in-flight disclosures cannot be recalled. In-process `Catalog.search`, `Catalog.get_memory`, and `Catalog.read_revision_bytes` require either `principal_id="assistant-a"` or explicit `trusted_local=True`; omitting both raises `ValueError`. Principal-scoped direct fetches raise `PermissionError` when ungranted. `seenx-memory search/get`, OCR writes, and the engine's `--trusted-local` path deliberately retain owner access.
 
-Identity and trusted mode are host configuration, not authentication. A future MCP adapter must bind its authenticated client to a principal and must never let that client choose a principal, trusted mode, grant writes, or the catalog path. No MCP server or external authentication is implemented here. Local processes with direct filesystem/catalog access remain trusted OS-account owners.
+Identity and trusted mode are host configuration, not authentication. The MCP adapter binds its local client to the owner-configured startup principal; tool arguments cannot choose a principal, trusted mode, grant writes, or the catalog path. External authentication isn't implemented. Local processes with direct filesystem/catalog access remain trusted OS-account owners.
 
 Requests are read-only. Startup can initialize or migrate the catalog and its derived index, just like the existing CLI. Use `seenx-memory` for deliberate import, annotation, editing, removal, OCR, or reindexing. No write methods are exposed through this protocol yet.
+
+## Read-only MCP over stdio
+
+From the repository root:
+
+```sh
+uv run --project python --extra mcp seenx-mcp --library /path/to/library --principal assistant-a
+```
+
+The optional `mcp` extra uses the [official MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk/tree/v1.x), `mcp>=1.28,<2`, with its low-level server and stdio lifecycle. The major-version bound keeps this adapter on the documented v1 SDK API; this SDK version is separate from the seenX version-1 engine contract. Dependencies were not resolved and `uv.lock` was not refreshed during this code-only change; the next unlocked `uv` invocation resolves the extra. No SDK is needed for the owner CLI or `seenx-engine`.
+
+Generic stdio MCP client configuration (replace both absolute paths):
+
+```json
+{
+  "mcpServers": {
+    "seenx": {
+      "command": "uv",
+      "args": ["run", "--project", "/absolute/path/to/seenX/python", "--extra", "mcp", "seenx-mcp", "--library", "/path/to/library", "--principal", "assistant-a"]
+    }
+  }
+}
+```
+
+`--principal` is required and validated before opening a library; missing/blank values exit nonzero with a stderr error. There is no `--trusted-local` option. An ungranted principal sees no search hits and cannot fetch any memory. Assign source/collection grants through the owner CLI above.
+
+The tool list is exactly `search` and `fetch`. `search` accepts the `memory.search` parameters below. `fetch` accepts `asset_id`, optional `revision_id`, and `include_image`; adding exactly one `region_id` or `observation_id` requires `revision_id` and selects `region.fetch`. Tool text contains the version-1 response envelope, including trace ID and sanitized errors; failures set MCP `isError`. Requested PNGs become MCP image content blocks, with dimensions/hash retained in text and no duplicate base64. No resources, prompts, writes, imports, removals, grants, or collection tools are registered. Retrieved text/images remain untrusted data. SDK/stdin buffering precedes the engine's request-size check; these are contract payload bounds, not a transport-memory sandbox.
 
 ## Framing and types
 
@@ -151,7 +178,7 @@ An invalid request doesn't terminate the session. An overlong input line is drai
 5. Decode an optional PNG and display it with its explicit dimensions/coordinate context.
 6. On shutdown, close stdin and wait for exit. Handle transport failure without discarding an unsaved native draft.
 
-Requests are processed sequentially in this slice. There is no request cancellation message, background indexing queue, or automatic native-library import. The native development library is still separate; migrating its captures and adding deliberate write operations need an explicit next integration step. Assistant integration must use grant-scoped access through a separately implemented adapter.
+Requests are processed sequentially in this slice. There is no request cancellation message, background indexing queue, or automatic native-library import. The native development library is still separate; migrating its captures and adding deliberate write operations need an explicit next integration step. Assistant integration uses the grant-scoped MCP adapter above.
 
 ## Verification and learning concepts
 
