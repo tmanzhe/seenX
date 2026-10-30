@@ -1,6 +1,11 @@
 """Additive catalog migrations, executed atomically under a write lock."""
 
+from contextlib import closing
+from datetime import datetime, timezone
+from pathlib import Path
 import sqlite3
+import sys
+import time
 
 from seenx.catalog_search_schema import V3_STATEMENTS
 from seenx.catalog_access import V4_STATEMENTS
@@ -52,7 +57,33 @@ V2_STATEMENTS = (
 )
 
 
-def migrate_catalog(connection: sqlite3.Connection) -> None:
+def backup_catalog(connection: sqlite3.Connection, version: int) -> None:
+    filename = next(row[2] for row in connection.execute("PRAGMA database_list") if row[1] == "main")
+    if not filename:  # In-memory catalogs have no neighboring backup path.
+        return
+    source = Path(filename)
+    while True:
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        destination = source.with_name(f"{source.name}.bak-v{version}-{stamp}")
+        try:
+            destination.touch(exist_ok=False)
+            break
+        except FileExistsError:
+            # A failed migration can be retried within the same second.
+            time.sleep(0.05)
+    try:
+        # The caller holds the write lock. Backing up that same connection
+        # would wait on its own transaction; a reader sees the committed state.
+        with closing(sqlite3.connect(source.as_uri() + "?mode=ro", uri=True)) as reader:
+            with closing(sqlite3.connect(destination)) as backup:
+                reader.backup(backup)
+    except BaseException:
+        destination.unlink(missing_ok=True)
+        raise
+    print(f"Catalog backup: {destination}", file=sys.stderr)
+
+
+def migrate_catalog(connection: sqlite3.Connection, *, backup: bool = True) -> None:
     try:
         with connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -60,6 +91,8 @@ def migrate_catalog(connection: sqlite3.Connection) -> None:
             version = connection.execute("PRAGMA user_version").fetchone()[0]
             if version not in (1, 2, 3, 4):
                 raise ValueError("Unsupported catalog schema")
+            if version < 4 and backup:
+                backup_catalog(connection, version)
             for target, statements in ((2, V2_STATEMENTS), (3, V3_STATEMENTS), (4, V4_STATEMENTS)):
                 if version < target:
                     for statement in statements:

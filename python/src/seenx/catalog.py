@@ -118,17 +118,19 @@ class Catalog:
             self.connection.execute("PRAGMA foreign_keys = ON")
             version = self.connection.execute("PRAGMA user_version").fetchone()[0]
             identity = self.connection.execute("PRAGMA application_id").fetchone()[0]
+            initialized = False
             if version == 0 and identity == 0:
                 tables = self.connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()
                 if tables:
                     raise ValueError("This file is not an empty seenX catalog")
                 self.connection.executescript(SCHEMA)
                 version, identity = 1, APPLICATION_ID
+                initialized = True
             if identity != APPLICATION_ID or version not in range(1, SCHEMA_VERSION + 1):
                 raise ValueError("Unsupported catalog schema; refusing to change it")
             if version < SCHEMA_VERSION:
                 with stage("catalog_migration", from_version=version, to_version=SCHEMA_VERSION):
-                    migrate_catalog(self.connection)
+                    migrate_catalog(self.connection, backup=not initialized)
             self.access = AccessGrants(self.connection)
         except BaseException:
             self.connection.close()
