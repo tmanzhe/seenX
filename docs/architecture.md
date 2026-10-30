@@ -12,7 +12,7 @@ The hosted website is a separate static preview. It never becomes the user's loc
 | --- | --- | --- |
 | Website | Next.js/React/TypeScript, sample capture, authored text boxes, spatial annotations, localStorage, JSON export | Maintain truthful product/docs copy and demo behavior |
 | Python prototype | Image/PDF reading, Vision OCR strings/boxes, folder text/visual retrieval, caching, diagnostics, versioned memory catalog, OCR quotes, FTS5 evidence search, and versioned local read-only search/fetch contract | Write/export contract, access grants, word/range selection, richer relationships/collections, catalog visual fusion, semantic note retrieval, portable export |
-| Native Mac app | SwiftUI/AppKit menu-bar app: translucent search, global shortcuts, system region capture, Vision text highlights, notes, separate capture library; optional Python catalog browser through a typed Swift client | Explicit capture import/write integration, unified launcher retrieval, ScreenCaptureKit adapter, source permissions, production distribution |
+| Native Mac app | SwiftUI/AppKit menu-bar app: translucent search, global shortcuts, system region capture, Vision text highlights, notes, separate capture library; launcher catalog search/fetch and optional Python catalog browser through the same typed Swift client | Explicit capture import/write integration, ScreenCaptureKit adapter, source permissions, production distribution |
 | Assistant bridge | Website illustration and export only | Opt-in, bounded read-only MCP retrieval; client integration/evaluation |
 
 ## Target stack and why
@@ -28,7 +28,7 @@ The hosted website is a separate static preview. It never becomes the user's loc
 
 ## Intended data flow
 
-The initial [local engine contract](../python/docs/engine-contract.md) implements bounded read-only search, memory fetch, and saved-region fetch with optional orientation-corrected PNG attachments. It wraps the existing catalog instead of introducing another search implementation. The trusted launcher selects one whole library; this is not yet a source/collection authorization boundary. A [typed Swift client and optional native browser](native-engine.md) now consume this contract with bounded requests, timeouts, process cleanup, and stale-result protection. Native capture writes, portable exports, server-side request cancellation, and the MCP adapter remain planned.
+The initial [local engine contract](../python/docs/engine-contract.md) implements bounded read-only search, memory fetch, and saved-region fetch with optional orientation-corrected PNG attachments. It wraps the existing catalog instead of introducing another search implementation. The trusted launcher selects one whole library; this is not yet a source/collection authorization boundary. The main launcher and [optional native browser](native-engine.md) reuse the same typed Swift client, browser model, and evidence preview, with bounded requests, timeouts, process cleanup, and stale-result protection. The launcher explicitly connects an existing catalog per session, labels catalog evidence alongside native matches, and fetches exact revisions/crops inline. Its empty query and library grid still show native captures. Native capture writes, portable exports, server-side request cancellation, and the MCP adapter remain planned.
 
 ```text
 SeenX capture or selected-source import

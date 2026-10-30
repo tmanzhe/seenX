@@ -1,6 +1,6 @@
 # seenX macOS app
 
-A basic native menu-bar app: a translucent search panel, quick screenshots, and screenshots with text highlights and a note. Built with SwiftUI/AppKit and Apple Vision on macOS 14 or later. Capture and native-library search use Apple frameworks without a Python runtime. An optional **Open Python Library…** browser connects to the prepared Python prototype through our local Swift client package.
+A basic native menu-bar app: a translucent search panel, quick screenshots, and screenshots with text highlights and a note. Built with SwiftUI/AppKit and Apple Vision on macOS 14 or later. Capture and native-library search use Apple frameworks without a Python runtime. The launcher can also connect to an existing Python catalog through the same local Swift client as the optional **Open Python Library…** browser.
 
 The interface follows the seenX Design Proposal with a launcher flow: compact glass search, a thumbnail library and saved-image previews inside the same floating panel, an image-led annotation stage with an inline note, and a first-run permission screen. The default is clear white Liquid Glass with a subtle blue tint, independent of the system appearance. macOS 26+ uses native clear Liquid Glass; macOS 14–25 use a frosted fallback. Reduce Transparency uses opaque surfaces.
 
@@ -63,6 +63,8 @@ Highlights refer to recognized text boxes, not arbitrary painted regions or char
 
 Search matches words in recognized text, notes, and highlights. An empty query lists recent captures. This is local literal search, not semantic/visual retrieval. Open a saved result to inspect the original image and saved context.
 
+Choose **Connect catalog…** in the launcher, select the prepared seenX repository and an existing folder containing `catalog.sqlite3`, then type to search. Up to five catalog evidence hits appear before native matches, labeled with their matched field and provenance; earlier revisions are marked. Return opens the exact saved revision inline, with full-image and saved-region fetch controls. Catalog search uses version-1 FTS5 phrase search through the existing client, with a short typing delay and stale-result protection. Empty queries still show native recents; **Browse Library** shows native captures. **Actions → Disconnect Catalog** ends this session; hiding the launcher keeps it connected. Catalog selection is per session and separate from the optional browser's connection.
+
 ## Storage and boundaries
 
 The menu-bar action **Open Python Library…** opens a separate read-only development browser. Click **Connect…**, choose the seenX repository with its prepared Python environment, and then choose an existing Python library folder containing `catalog.sqlite3`. Search saved notes/selections/OCR, select evidence to fetch its exact image, and switch to a saved-region crop. Full-image previews mark the matching target. Helper failures disconnect safely and preserve the typed query; closing the browser closes its connection. See [the step-by-step integration lesson](../../docs/native-engine.md) for setup, limits, tests, and the rationale.
@@ -73,7 +75,7 @@ The app captures only after a deliberate capture action. Its panels are hidden d
 
 ## Remaining integration
 
-- Extend the optional shared-engine browser into the main capture/search flow after reconciling the native development library through an explicit import/write design. The browser already uses the Python search/fetch contract; the main launcher and capture storage remain separate.
+- Reconcile native capture storage with the catalog through an explicit import/write design preserving originals, OCR, notes, and highlights. Launcher retrieval now uses the existing search/fetch contract; captures are not automatically imported.
 - Character-level text selection, editable saved annotations, image import, and library deletion/organization.
 - ScreenCaptureKit capture adapter, supported source metadata, source permission management, portable backup/restore, and an opt-in read-only MCP bridge.
 - Verify Retina/multi-display selection, permission denial/revocation, shortcut conflicts, and alternate keyboard layouts on additional Macs before a release.

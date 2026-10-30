@@ -7,7 +7,7 @@ We already had two useful pieces: a native screenshot app, and a Python catalog 
 1. **Preserve the native baseline.** The capture app, annotation editor, storage checks, and existing shortcuts were committed separately. That gives us a clear point to compare against if integration breaks a capture behavior.
 2. **Add a Swift client package.** [SeenXEngineClient](../packages/SeenXEngineClient) launches the existing Python helper and communicates through process pipes. It imports Foundation and Darwin; there are no downloaded Swift packages or new Python dependencies.
 3. **Agree on the message format.** The client first sends `engine.info` and checks the protocol and supported methods. Requests carry an ID; the response must carry that same ID. Typed Swift models decode the search hits, memory context, regions, and attachments.
-4. **Add an explicit browser.** The menu-bar action **Open Python Library…** opens a separate development browser. You choose the repository and existing catalog, then search and open evidence. This doesn't replace the main capture launcher.
+4. **Add an explicit browser and launcher connection.** The menu-bar action **Open Python Library…** opens a separate development browser. The main launcher also offers **Connect catalog…**, reusing that browser's model, client, and evidence preview. Each connection explicitly selects its repository and existing catalog; capture storage remains separate.
 5. **Handle failures as part of the feature.** Requests run off the main UI thread. A timeout, closed pipe, invalid response, or exited helper ends that connection. A normal method error can leave it usable. Closing the browser disconnects it; an old request cannot repopulate a closed or newly connected window.
 6. **Check real behavior.** Helper-process tests cover the client boundary. Native model tests cover closing/reconnecting and failure state. An opt-in integration check seeds an isolated catalog with an existing image, then exercises actual Swift → Python search, full-image fetch, OCR-region fetch, and point/region crops.
 
@@ -38,7 +38,7 @@ If an older copy is running, quit it through the app first so it can protect any
 5. Click a match. The app fetches its exact saved revision and shows the matching target on the full image. You can switch to **Saved region** to fetch only that saved crop.
 6. Choose **Disconnect**, or close the browser, when finished. After a helper failure, use **Connect…** again.
 
-Search uses the existing FTS5 phrase mode. It doesn't run CLIP, perform OCR, search filenames, or understand synonyms. Results are evidence hits: one image can appear once for its note and again for a matching OCR line. Earlier revisions are labeled. The main capture launcher still searches its native development library using its existing matching rules.
+Search uses the existing FTS5 phrase mode. It doesn't run CLIP, perform OCR, search filenames, or understand synonyms. Results are evidence hits: one image can appear once for its note and again for a matching OCR line. Earlier revisions are labeled. In the main launcher, choose **Connect catalog…** and select the same prepared repository/catalog. Typing searches after a short delay; up to five labeled catalog hits precede native matches. Return opens an inline preview with full-image and saved-region controls; Escape returns to the query and selection. Empty queries and the library grid still show native captures. **Actions → Disconnect Catalog** ends the launcher's independent session; hiding it keeps the connection. Selection is not persisted across app restarts.
 
 ## Why pipes, and what is a client?
 
@@ -62,7 +62,7 @@ The delivered PNG has its own hash. The catalog revision hash still identifies t
 
 The client serializes requests on a worker queue, bounds request/response sizes, correlates response IDs, and checks the protocol envelope. Its default request deadline is 15 seconds. Timeout or cancellation closes the session because a late response could otherwise be mistaken for the next request's answer. Shutdown closes stdin, allows the helper to finish, and escalates if it doesn't exit.
 
-The browser tracks a connection generation. Closing or replacing the connection changes that generation; asynchronous work from an older generation can't overwrite the current screen. Fatal transport errors change the browser to disconnected while preserving the typed query. None of these operations touches the capture editor or its unsaved draft.
+The browser model tracks a connection generation. Disconnecting or replacing the connection changes that generation; asynchronous work from an older generation can't overwrite the current screen. The launcher also discards results for older query text and queues the latest query while an existing bounded request finishes, without canceling the transport. Fatal transport errors disconnect while preserving the typed query. None of these operations touches the capture editor or its unsaved draft.
 
 Python's normal local JSONL diagnostics remain enabled for this browser. They record engine method names, correlation IDs, timings, and outcome/error codes. Query text, note bodies, paths, and image bytes aren't logged by the client. Helper stderr is discarded rather than copied into a UI error or another log. See [the engine contract](../python/docs/engine-contract.md) for exact limits and error codes.
 
@@ -88,4 +88,4 @@ The check imports into a temporary library, creates test notes/OCR observations 
 
 Concepts to learn next: **Swift packages**, **Codable/Decodable**, **async/await**, **the main actor**, **process pipes**, **timeouts**, **request IDs**, and **stale asynchronous results**. On the Python side, follow **JSON serialization**, **context managers**, **exceptions**, and **database transactions** through the [engine lesson](../python/docs/engine-contract.md).
 
-Next comes an explicit import/write design for native captures. The two libraries need a deliberate mapping for image revisions, OCR boxes, notes, and highlights before the main launcher can rely on one shared catalog. Portable export and assistant access remain separate roadmap steps.
+Next comes an explicit import/write design for native captures. Launcher catalog retrieval is read-only; the two libraries still need a deliberate mapping for image revisions, OCR boxes, notes, and highlights. Portable export and assistant access remain separate roadmap steps.
