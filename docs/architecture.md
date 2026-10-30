@@ -86,6 +86,8 @@ Retrieve candidates from FTS5, compatible image/text vectors, and separately eva
 
 Keep a labeled dataset with exact phrases, visual descriptions, note paraphrases, region-specific requests, and no-match examples. Pin model versions and preprocessing. Measure top-k quality, false matches, indexing/warm-query costs, and memory/storage; cosine scores are not confidence percentages.
 
+The Python [`seenx-eval` command](../python/docs/retrieval-evaluation.md) now compares labeled folder queries in lexical (existing literal text), visual, and hybrid modes without changing ranking. It reports macro recall@k, full accepted-ranking MRR, and separate no-match false-positive counts. A metadata-only starter records the documented submarine no-match case; positive laptop/basketball labels await actual image IDs because the ignored practice folder was absent from the implementation checkout. No shared Wilson helper exists, so confidence intervals are explicitly unavailable. This is a measurement scaffold for folder retrieval; catalog FTS5/visual fusion, region retrieval, semantic note evaluation, and resource benchmarks remain separate work.
+
 ## Assistant bridge and harness
 
 MCP ships in V1. Build it alongside the native interface once the shared memory contract exists.
