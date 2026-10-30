@@ -74,6 +74,123 @@ class CatalogTests(unittest.TestCase):
             self.assertEqual(reverted["revision_id"], first["revision_id"])
             self.assertEqual(catalog.list_memories()[0]["revision_count"], 2)
 
+    def test_multiple_region_notes_survive_reopen_identically(self):
+        regions = ([0, 0, 1, 1], [0.5, 0.5, 0.5, 0.5])
+        notes = ("First region\nKeep this café", "Second region")
+        with Catalog(self.library) as catalog:
+            imported = catalog.import_image(self.source)
+            saved = [catalog.add_note(imported["revision_id"], note, region=region)
+                     for note, region in zip(notes, regions)]
+            expected = catalog.get_memory(imported["asset_id"], trusted_local=True)
+        with Catalog(self.library) as catalog:
+            memory = catalog.get_memory(imported["asset_id"], trusted_local=True)
+            self.assertEqual(memory, expected)
+            by_id = {item["id"]: item for item in memory["annotations"]}
+            self.assertEqual(len(by_id), 2)
+            for ids, note, region in zip(saved, notes, regions):
+                annotation = by_id[ids["annotation_id"]]
+                self.assertEqual(annotation["note"], note)
+                self.assertEqual(annotation["region_id"], ids["region_id"])
+                self.assertEqual(annotation["revision_id"], imported["revision_id"])
+                self.assertEqual(annotation["target"], {
+                    "kind": "region", **dict(zip(("x", "y", "width", "height"), region)),
+                })
+
+    def test_region_and_note_update_together_preserving_ids_and_other_regions(self):
+        with Catalog(self.library) as catalog:
+            imported = catalog.import_image(self.source)
+            saved = catalog.add_note(imported["revision_id"], "Before", region=[0, 0, 1, 1])
+            other = catalog.add_note(imported["revision_id"], "Other", region=[0, 0, 0.1, 0.1])
+            before = {item["id"]: item for item in
+                      catalog.get_memory(imported["asset_id"], trusted_local=True)["annotations"]}
+            catalog.edit_note(saved["annotation_id"], region=[0.2, 0.3, 0.4, 0.5])
+            moved = next(item for item in catalog.get_memory(imported["asset_id"], trusted_local=True)["annotations"]
+                         if item["id"] == saved["annotation_id"])
+            self.assertEqual(moved["note"], "Before")
+            self.assertEqual(moved["target"],
+                             {"kind": "region", "x": 0.2, "y": 0.3, "width": 0.4, "height": 0.5})
+            catalog.edit_note(saved["annotation_id"], note="After", region=[0.1, 0.2, 0.3, 0.4])
+            expected = catalog.get_memory(imported["asset_id"], trusted_local=True)
+            after = {item["id"]: item for item in expected["annotations"]}
+            annotation = after[saved["annotation_id"]]
+            self.assertEqual(annotation["note"], "After")
+            self.assertEqual(annotation["region_id"], saved["region_id"])
+            self.assertEqual(annotation["revision_id"], imported["revision_id"])
+            self.assertEqual(annotation["created_at"], before[saved["annotation_id"]]["created_at"])
+            self.assertEqual(annotation["target"],
+                             {"kind": "region", "x": 0.1, "y": 0.2, "width": 0.3, "height": 0.4})
+            self.assertEqual(after[other["annotation_id"]], before[other["annotation_id"]])
+        with Catalog(self.library) as catalog:
+            self.assertEqual(catalog.get_memory(imported["asset_id"], trusted_local=True), expected)
+
+    def test_invalid_region_add_and_update_leave_memory_unchanged(self):
+        invalid = (
+            [-0.1, 0, 0.2, 0.2], [0, -0.1, 0.2, 0.2],
+            [1.1, 0, 0.2, 0.2], [0, 1.1, 0.2, 0.2],
+            [0, 0, -0.1, 0.2], [0, 0, 0.2, -0.1],
+            [0, 0, 0, 0.2], [0, 0, 0.2, 0],
+            [0, 0, 1.1, 0.2], [0, 0, 0.2, 1.1],
+            [0.9, 0, 0.2, 0.2], [0, 0.9, 0.2, 0.2],
+            [0, 0, math.nan, 0.2], [0, math.inf, 0.2, 0.2],
+            [0, 0, "0.2", 0.2], [0, 0, 1],
+        )
+        with Catalog(self.library) as catalog:
+            imported = catalog.import_image(self.source)
+            saved = catalog.add_note(imported["revision_id"], "Original", region=[0.1, 0.2, 0.3, 0.4])
+            expected = catalog.get_memory(imported["asset_id"], trusted_local=True)
+            for region in invalid:
+                for operation in ("add", "update"):
+                    with self.subTest(region=region, operation=operation):
+                        with self.assertRaises(ValueError):
+                            if operation == "add":
+                                catalog.add_note(imported["revision_id"], "Invalid", region=region)
+                            else:
+                                catalog.edit_note(saved["annotation_id"], note="Changed", region=region)
+                        self.assertEqual(catalog.get_memory(imported["asset_id"], trusted_local=True), expected)
+            with self.assertRaises(ValueError):
+                catalog.edit_note(saved["annotation_id"], note="", region=[0, 0, 1, 1])
+            self.assertEqual(catalog.get_memory(imported["asset_id"], trusted_local=True), expected)
+        with Catalog(self.library) as catalog:
+            self.assertEqual(catalog.get_memory(imported["asset_id"], trusted_local=True), expected)
+
+    def test_delete_region_removes_its_note_and_relationships_only(self):
+        with Catalog(self.library) as catalog:
+            imported = catalog.import_image(self.source)
+            removed = catalog.add_note(imported["revision_id"], "Remove", region=[0, 0, 1, 1])
+            kept = catalog.add_note(imported["revision_id"], "Keep", region=[0.1, 0.2, 0.3, 0.4])
+            self.assertTrue(catalog.delete_note(removed["annotation_id"]))
+            self.assertFalse(catalog.delete_note(removed["annotation_id"]))
+            expected = catalog.get_memory(imported["asset_id"], trusted_local=True)
+            self.assertEqual([item["id"] for item in expected["annotations"]], [kept["annotation_id"]])
+            self.assertEqual(expected["annotations"][0]["note"], "Keep")
+            deleted_ids = {removed["annotation_id"], removed["region_id"]}
+            self.assertFalse(any(link["subject"] in deleted_ids or link["object"] in deleted_ids
+                                 for link in expected["relationships"]))
+            self.assertEqual(catalog.list_memories()[0]["annotation_count"], 1)
+        with Catalog(self.library) as catalog:
+            self.assertEqual(catalog.get_memory(imported["asset_id"], trusted_local=True), expected)
+
+    def test_region_mutations_roll_back_completely_on_write_failure(self):
+        with Catalog(self.library) as catalog:
+            imported = catalog.import_image(self.source)
+            saved = catalog.add_note(imported["revision_id"], "Original", region=[0.1, 0.2, 0.3, 0.4])
+            expected = catalog.get_memory(imported["asset_id"], trusted_local=True)
+            for action in ("INSERT", "UPDATE", "DELETE"):
+                with self.subTest(action=action):
+                    catalog.connection.execute(f"""CREATE TRIGGER fail_annotation BEFORE {action} ON annotations
+                        BEGIN SELECT RAISE(ABORT, 'injected write failure'); END""")
+                    with self.assertRaises(sqlite3.IntegrityError):
+                        if action == "INSERT":
+                            catalog.add_note(imported["revision_id"], "New", region=[0, 0, 1, 1])
+                        elif action == "UPDATE":
+                            catalog.edit_note(saved["annotation_id"], note="Changed", region=[0, 0, 1, 1])
+                        else:
+                            catalog.delete_note(saved["annotation_id"])
+                    self.assertEqual(catalog.get_memory(imported["asset_id"], trusted_local=True), expected)
+                    with Catalog(self.library) as reopened:
+                        self.assertEqual(reopened.get_memory(imported["asset_id"], trusted_local=True), expected)
+                    catalog.connection.execute("DROP TRIGGER fail_annotation")
+
     def test_missing_original_does_not_break_saved_evidence(self):
         with Catalog(self.library) as catalog:
             imported = catalog.import_image(self.source)
