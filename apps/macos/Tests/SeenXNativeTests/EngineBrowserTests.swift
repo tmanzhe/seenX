@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SeenXEngineClient
 import XCTest
 @testable import SeenXNative
@@ -64,6 +65,46 @@ final class EngineBrowserTests: XCTestCase {
         XCTAssertNotNil(model.error)
         XCTAssertEqual(model.query, "Keep this query")
         XCTAssertTrue(model.hits.isEmpty)
+    }
+
+    @MainActor
+    func testLauncherQueuesLatestQueryAndDiscardsAnOlderSearch() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let helper = directory.appendingPathComponent("helper.sh")
+        try #"""
+        IFS= read -r request
+        request_id=$(printf '%s\n' "$request" | /usr/bin/sed -E 's/.*"id"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/')
+        printf '{"version":1,"id":"%s","trace_id":"test","result":{"protocol_version":1,"catalog_schema_version":3,"read_only_requests":true,"methods":["engine.info","memory.search","memory.fetch","region.fetch"],"limits":{}}}\n' "$request_id"
+        IFS= read -r request
+        request_id=$(printf '%s\n' "$request" | /usr/bin/sed -E 's/.*"id"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/')
+        /bin/sleep 0.4
+        printf '{"version":1,"id":"%s","trace_id":"test","result":[{"asset_id":"asset","revision_id":"revision","is_current_revision":true,"annotation_id":"annotation","matched_field":"note","method":"fts5","excerpt":"Old evidence","score":1,"score_kind":"rank","score_direction":"lower","provenance":{"origin":"user","confirmation":"confirmed"},"target":{"kind":"whole","x":0,"y":0,"width":1,"height":1}}]}\n' "$request_id"
+        IFS= read -r request
+        request_id=$(printf '%s\n' "$request" | /usr/bin/sed -E 's/.*"id"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/')
+        case "$request" in *latest*) result='[]' ;; *) exit 1 ;; esac
+        printf '{"version":1,"id":"%s","trace_id":"test","result":%s}\n' "$request_id" "$result"
+        IFS= read -r request
+        """#.write(to: helper, atomically: true, encoding: .utf8)
+        let model = EngineBrowserModel()
+        defer { model.disconnect() }
+        model.connect(configuration: .init(executableURL: URL(fileURLWithPath: "/bin/sh"), arguments: [helper.path]))
+        try await waitUntil { !model.busy }
+        XCTAssertTrue(model.connected, model.error ?? "")
+        var displayedOldEvidence = false
+        let observation = model.$hits.sink { if !$0.isEmpty { displayedOldEvidence = true } }
+        defer { observation.cancel() }
+        model.query = "old"
+        model.search()
+        model.updateSearchQuery("intermediate")
+        model.updateSearchQuery("latest")
+        try await waitUntil { !model.busy && model.searched }
+        XCTAssertEqual(model.query, "latest")
+        XCTAssertTrue(model.connected, model.error ?? "")
+        XCTAssertNil(model.error)
+        XCTAssertTrue(model.hits.isEmpty)
+        XCTAssertFalse(displayedOldEvidence)
     }
 
     /// Opt in locally with a real existing image; no personal fixture is committed.

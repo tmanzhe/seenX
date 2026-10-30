@@ -21,6 +21,19 @@ final class LauncherNavigationTests: XCTestCase {
     }
 
     @MainActor
+    func testCatalogPreviewReturnsToTheSelectedEvidence() {
+        let navigation = LauncherNavigation()
+        navigation.query = "saved region"
+        navigation.selectedIndex = 3
+        navigation.openCatalogHit(id: "revision:note:annotation")
+        XCTAssertEqual(navigation.screen, .catalogDetail("revision:note:annotation"))
+        XCTAssertTrue(navigation.handleEscape())
+        XCTAssertEqual(navigation.screen, .search)
+        XCTAssertEqual(navigation.query, "saved region")
+        XCTAssertEqual(navigation.selectedIndex, 3)
+    }
+
+    @MainActor
     func testLibraryPreviewHasItsOwnBackStack() {
         let navigation = LauncherNavigation()
         navigation.query = "original search"
