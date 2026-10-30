@@ -176,7 +176,7 @@ final class EngineBrowserTests: XCTestCase {
 
         // The same typed client must decode OCR evidence and an edge-point region.
         let client = try await EngineClient.launch(configuration: .init(executableURL: URL(fileURLWithPath: interpreter),
-            arguments: ["-m", "seenx.engine_stdio", "--library", library.path, "--no-log"], currentDirectoryURL: repository))
+            arguments: ["-m", "seenx.engine_stdio", "--library", library.path, "--trusted-local", "--no-log"], currentDirectoryURL: repository))
         let observations = try await client.search("fixture observation marker")
         let observation = try XCTUnwrap(observations.first)
         let observationRegion = try await client.fetchRegion(assetID: observation.assetID, revisionID: observation.revisionID,

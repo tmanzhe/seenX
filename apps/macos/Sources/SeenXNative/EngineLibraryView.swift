@@ -73,7 +73,7 @@ final class EngineBrowserModel: ObservableObject {
 
     func connect(interpreter: URL, repository: URL, library: URL) {
         connect(configuration: .init(executableURL: interpreter,
-            arguments: ["-m", "seenx.engine_stdio", "--library", library.path], currentDirectoryURL: repository))
+            arguments: ["-m", "seenx.engine_stdio", "--library", library.path, "--trusted-local"], currentDirectoryURL: repository))
     }
 
     func connect(configuration: EngineClient.Configuration) {
