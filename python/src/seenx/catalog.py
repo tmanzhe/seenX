@@ -238,7 +238,8 @@ class Catalog:
         return {"annotation_id": annotation_id, "region_id": region_id, "revision_id": revision_id}
 
     def edit_note(self, annotation_id: str, note: str | None = None,
-                  selected_text: str | None = None) -> None:
+                  selected_text: str | None = None, *, region: list | None = None) -> None:
+        """Atomically edit text and, when supplied, the normalized rectangle target."""
         replace_selection = selected_text is not None
         with self.connection:
             self.connection.execute("BEGIN IMMEDIATE")
@@ -249,6 +250,10 @@ class Catalog:
             selected_text = previous["selected_text"] if selected_text is None else selected_text
             if not note.strip() and not selected_text.strip():
                 raise ValueError("Provide a note or selected text")
+            if region is not None:
+                geometry = target_geometry(region=region)
+                self.connection.execute("""UPDATE regions SET kind = ?, x = ?, y = ?, width = ?, height = ?
+                                        WHERE id = ?""", (*geometry, previous["region_id"]))
             self.connection.execute("UPDATE annotations SET note = ?, selected_text = ?, updated_at = ? WHERE id = ?",
                                     (note, selected_text, timestamp(), annotation_id))
             if replace_selection:
