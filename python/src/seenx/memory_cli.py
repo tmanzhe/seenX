@@ -87,11 +87,12 @@ def main() -> None:
                               "granted": args.command == "grant"}
                 elif args.command == "search":
                     result = catalog.search(args.query, match=args.match, limit=args.limit,
-                                            asset_id=args.asset, revision_id=args.revision, current_only=args.current_only)
+                                            asset_id=args.asset, revision_id=args.revision,
+                                            current_only=args.current_only, trusted_local=True)
                 elif args.command == "reindex":
                     result = {"indexed_documents": catalog.rebuild_search()}
                 elif args.command == "get":
-                    result = catalog.get_memory(args.asset_id, args.revision)
+                    result = catalog.get_memory(args.asset_id, args.revision, trusted_local=True)
                 elif args.command == "ocr":
                     result = catalog.recognize_text(args.revision_id)
                 elif args.command == "note":

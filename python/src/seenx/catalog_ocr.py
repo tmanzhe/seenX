@@ -91,7 +91,7 @@ def persist_observations(catalog, revision_id: str, result: dict) -> dict:
 
 
 def recognize_revision(catalog, revision_id: str, configuration: dict | None = None, extractor=None) -> dict:
-    revision, payload = catalog.read_revision_bytes(revision_id)
+    revision, payload = catalog.read_revision_bytes(revision_id, trusted_local=True)
     expected = ocr_configuration() if configuration is None else configuration
     key, _ = configuration_identity(expected)
     existing = catalog.connection.execute("SELECT id FROM ocr_runs WHERE revision_id = ? AND configuration_key = ?",

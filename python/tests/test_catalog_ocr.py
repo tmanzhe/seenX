@@ -44,7 +44,7 @@ class CatalogOcrTests(unittest.TestCase):
         observation = run["observations"][0]
         saved = self.catalog.add_note(self.revision_id, "Use this spacing", observation_id=observation["id"])
         with Catalog(self.root / "library") as reopened:
-            memory = reopened.get_memory(self.imported["asset_id"])
+            memory = reopened.get_memory(self.imported["asset_id"], trusted_local=True)
         note = memory["annotations"][0]
         self.assertEqual(note["id"], saved["annotation_id"])
         self.assertEqual(note["selected_text"], "Checkout")
@@ -74,7 +74,7 @@ class CatalogOcrTests(unittest.TestCase):
         changed["observations"][0]["text"] = "Different recognition"
         second = persist_observations(self.catalog, self.revision_id, changed)
         self.assertNotEqual(first["id"], second["id"])
-        memory = self.catalog.get_memory(self.imported["asset_id"])
+        memory = self.catalog.get_memory(self.imported["asset_id"], trusted_local=True)
         self.assertEqual(len(memory["ocr_runs"]), 2)
         self.assertEqual(memory["annotations"][0]["selected_text"], "Checkout")
 
@@ -150,9 +150,9 @@ class CatalogOcrTests(unittest.TestCase):
         observation = persist_observations(self.catalog, self.revision_id, self.result)["observations"][0]
         note = self.catalog.add_note(self.revision_id, observation_id=observation["id"])
         self.catalog.edit_note(note["annotation_id"], note="A thought")
-        self.assertEqual(self.catalog.get_memory(self.imported["asset_id"])["annotations"][0]["quoted_observation_id"], observation["id"])
+        self.assertEqual(self.catalog.get_memory(self.imported["asset_id"], trusted_local=True)["annotations"][0]["quoted_observation_id"], observation["id"])
         self.catalog.edit_note(note["annotation_id"], selected_text="Corrected transcription")
-        memory = self.catalog.get_memory(self.imported["asset_id"])
+        memory = self.catalog.get_memory(self.imported["asset_id"], trusted_local=True)
         self.assertIsNone(memory["annotations"][0]["quoted_observation_id"])
         self.assertEqual(memory["annotations"][0]["selected_text_origin"], "user")
         self.assertEqual(memory["ocr_runs"][0]["observations"][0]["text"], "Checkout")
@@ -186,16 +186,16 @@ class MigrationTests(unittest.TestCase):
 
     def test_version_one_migrates_without_changing_existing_notes_or_ids(self):
         with Catalog(self.root) as catalog:
-            memory = catalog.get_memory("asset")
+            memory = catalog.get_memory("asset", trusted_local=True)
             self.assertEqual(memory["schema_version"], SCHEMA_VERSION)
             self.assertEqual(memory["annotations"][0]["id"], "note")
             self.assertEqual(memory["annotations"][0]["note"], "Legacy note")
             self.assertEqual(memory["annotations"][0]["selected_text_origin"], "user")
             self.assertEqual(memory["annotations"][0]["created_at"], "old-time")
             self.assertEqual(memory["ocr_runs"], [])
-            self.assertEqual(catalog.search("legacy note")[0]["annotation_id"], "note")
+            self.assertEqual(catalog.search("legacy note", trusted_local=True)[0]["annotation_id"], "note")
         with Catalog(self.root) as catalog:
-            self.assertEqual(len(catalog.get_memory("asset")["annotations"]), 1)
+            self.assertEqual(len(catalog.get_memory("asset", trusted_local=True)["annotations"]), 1)
 
     def test_failed_migration_rolls_back_schema_and_can_be_retried(self):
         with patch("seenx.catalog_migrations.V2_STATEMENTS", (*V2_STATEMENTS[:3], "INVALID SQL")):
@@ -206,7 +206,7 @@ class MigrationTests(unittest.TestCase):
             self.assertIsNone(connection.execute("SELECT name FROM sqlite_master WHERE name = 'ocr_runs'").fetchone())
             self.assertNotIn("selected_text_origin", [row[1] for row in connection.execute("PRAGMA table_info(annotations)")])
         with Catalog(self.root) as catalog:
-            self.assertEqual(catalog.get_memory("asset")["annotations"][0]["note"], "Legacy note")
+            self.assertEqual(catalog.get_memory("asset", trusted_local=True)["annotations"][0]["note"], "Legacy note")
 
 
 if __name__ == "__main__":
