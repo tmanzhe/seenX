@@ -73,7 +73,7 @@ Re-importing the same source path and unchanged bytes reuses the asset and revis
 uv run --project python seenx-memory get ASSET_ID --revision OLD_REVISION_ID
 ```
 
-A renamed source path currently creates a separate asset on import; relinking isn't implemented. Identical image bytes imported from two paths can share a snapshot file, while keeping separate asset identities. The catalog doesn't infer that different source paths should be one logical memory.
+A renamed source path currently creates a separate asset on image import. [Archive restore](library-archive.md) can resolve originals by content hash while preserving archived asset identities. Identical image bytes imported from two paths can share a snapshot file, while keeping separate asset identities. The catalog doesn't infer that different source paths should be one logical memory.
 
 ## Edit and remove
 
@@ -99,7 +99,7 @@ uv run --project python seenx-memory --library /path/to/my-library list
 
 If an original goes missing, saved evidence still comes from its managed snapshot. A missing or modified snapshot produces an explicit error and doesn't discard the database notes. Re-importing intact original bytes can restore a missing snapshot. An existing corrupt snapshot is reported rather than silently overwritten.
 
-Snapshots are published only after all bytes are written, then database records commit. An interrupted import may leave an unreferenced object; we prefer that to a committed record pointing at a partially written image. Filesystem writes and SQLite writes aren't one shared transaction. Full backup/restore, crash recovery, and storage reclamation remain later milestones.
+Snapshots are published only after all bytes are written, then database records commit. An interrupted import may leave an unreferenced object; we prefer that to a committed record pointing at a partially written image. Filesystem writes and SQLite writes aren't one shared transaction. [Portable library archives](library-archive.md) now support complete/context-only export and fresh-path restore; crash recovery and storage reclamation remain later milestones.
 
 ## The Python and database concepts in this step
 
@@ -117,6 +117,6 @@ The catalog commands share our local diagnostics. Logs include operation names a
 
 This step proves import → annotate → restart → recover, with changed/missing-original handling, snapshot verification, and transactional edit/delete behavior. The tests use placeholder bytes and mocked image decoding, not generated image fixtures. We also exercised the CLI in separate processes using existing practice photos in an isolated temporary library; the original practice files were unchanged.
 
-The original folder-search command still uses selected files and derived caches. The new `seenx-memory search` command searches saved notes, selected text, and OCR through FTS5. This Python slice doesn't provide the native interface, thumbnail generator, complete-library archive, encryption, source/collection authorization, service, or MCP endpoint.
+The original folder-search command still uses selected files and derived caches. The new `seenx-memory search` command searches saved notes, selected text, and OCR through FTS5. Later Python slices add source/collection authorization, read-only engine/MCP access, and [complete/context-only library archives](library-archive.md). Thumbnail generation and archive encryption remain planned.
 
-Continue with [OCR observations](ocr-observations.md) and [catalog retrieval](catalog-search.md). Collections, tags, richer assertions, and export/restore remain part of the larger roadmap.
+Continue with [OCR observations](ocr-observations.md), [catalog retrieval](catalog-search.md), and [library archives](library-archive.md). Tags, richer assertions, and selected-collection exports remain part of the larger roadmap.
