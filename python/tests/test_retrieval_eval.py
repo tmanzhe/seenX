@@ -10,6 +10,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from seenx.retrieval_eval import evaluate, load_labels, main, result_id
+from seenx.statistics import wilson_interval
 
 
 class EvaluationTests(unittest.TestCase):
@@ -62,7 +63,15 @@ class EvaluationTests(unittest.TestCase):
             row = report["modes"][mode]["queries"][0]
             self.assertEqual(row["ranked_ids"], ["b.jpg", "a.jpg", "c.jpg"])
             self.assertEqual(row["results"][0]["evidence"], positive[0]["evidence"])
-        self.assertIsNone(report["confidence_intervals"])
+            estimate = row["recall_at_k_estimates"]["1"]
+            self.assertEqual(estimate["value"], row["recall_at_k"]["1"])
+            self.assertEqual((estimate["hits"], estimate["total"]), (0, 1))
+            self.assertEqual(estimate["interval"][0], 0)
+            self.assertGreater(estimate["interval"][1], 0)
+            self.assertEqual(summary["micro_recall_at_k"]["1"], estimate)
+            negative = report["modes"][mode]["queries"][1]
+            self.assertIsNone(negative["recall_at_k_estimates"]["1"]["interval"])
+        self.assertEqual(report["confidence_intervals"]["method"], "wilson")
         self.assertTrue(any("Wilson" in note for note in report["metric_notes"]))
 
     def test_lexical_only_never_loads_visual_model(self):
@@ -71,6 +80,17 @@ class EvaluationTests(unittest.TestCase):
                 report = evaluate(self.folder, self.labels, [5], ["lexical"])
         self.assertIsNone(report["settings"]["model_id"])
         self.assertEqual(report["modes"]["lexical"]["summary"]["mrr"], 0)
+
+    def test_each_recall_estimate_has_the_matching_wilson_interval(self):
+        self.labels["queries"][0]["relevant_ids"] = ["a.jpg", "b.jpg"]
+        with patch("seenx.retrieval_eval.search_files", side_effect=[self.hits("a.jpg", "a.jpg", "b.jpg"), []]):
+            report = evaluate(self.folder, self.labels, [2, 3], ["lexical"])
+        query = report["modes"]["lexical"]["queries"][0]
+        for k, hits in (("2", 1), ("3", 2)):
+            estimate = query["recall_at_k_estimates"][k]
+            self.assertEqual(estimate["value"], query["recall_at_k"][k])
+            self.assertEqual(estimate["interval"], list(wilson_interval(hits, 2)))
+            self.assertEqual(estimate["total"], 2)
 
     def test_missing_labeled_file_fails_before_search_or_model_loading(self):
         self.labels["queries"][0]["relevant_ids"] = ["missing.jpg"]
@@ -91,6 +111,7 @@ class EvaluationTests(unittest.TestCase):
         self.assertEqual(search.call_args.args[1], "no match")
         summary = report["modes"]["lexical"]["summary"]
         self.assertEqual(summary["recall_at_k"], {"1": None, "5": None})
+        self.assertIsNone(summary["micro_recall_at_k"]["1"]["interval"])
         self.assertIsNone(summary["mrr"])
         self.assertEqual(summary["no_match_false_positives"], 1)
         self.assertEqual(report["dataset"]["pending_queries"], self.labels["pending_queries"])
@@ -133,6 +154,9 @@ class EvaluationTests(unittest.TestCase):
         report = json.loads(output.getvalue())
         self.assertEqual(report["settings"]["k"], [1, 5])
         self.assertEqual(diagnostics.getvalue().count("search progress"), 2)
+        estimate = report["modes"]["lexical"]["queries"][0]["recall_at_k_estimates"]["1"]
+        self.assertEqual(estimate["value"], 0)
+        self.assertEqual(len(estimate["interval"]), 2)
 
 
 if __name__ == "__main__":

@@ -3,6 +3,8 @@
 from collections.abc import Collection, Sequence
 from statistics import fmean
 
+from seenx.statistics import wilson_interval
+
 
 def recall_at_k(ranked_ids: Sequence[str], relevant_ids: Collection[str],
                 k: int) -> float | None:
@@ -30,11 +32,26 @@ def reciprocal_rank(ranked_ids: Sequence[str],
     return 0.0
 
 
+def recall_counts_at_k(ranked_ids: Sequence[str], relevant_ids: Collection[str], k: int) -> tuple[int, int]:
+    """Distinct retrieved/relevant counts for a query's binomial recall estimate."""
+    recall_at_k([], [], k)
+    relevant = set(relevant_ids)
+    return len(set(ranked_ids[:k]) & relevant), len(relevant)
+
+
+def recall_estimate(hits: int, total: int) -> dict:
+    """Keep the point estimate, denominator, and its 95% interval together."""
+    interval = wilson_interval(hits, total)
+    return {"value": hits / total if total else None, "hits": hits, "total": total,
+            "interval": list(interval) if interval is not None else None}
+
+
 def summarize_queries(rows: Sequence[dict], ks: Sequence[int]) -> dict:
-    """Macro-average positive queries; account for no-match queries separately.
+    """Macro-average positives and report pooled recall with Wilson bounds.
 
     Each row contains relevant_ids and ranked_ids. Missing relevant hits score
-    zero; an empty positive-query population is undefined, represented by None.
+    zero; no-match queries are separate. An empty positive-query population is
+    undefined, represented by None. Only pooled counts get a binomial interval.
     """
     if not ks:
         raise ValueError("At least one k is required")
@@ -49,6 +66,12 @@ def summarize_queries(rows: Sequence[dict], ks: Sequence[int]) -> dict:
             str(k): fmean(recall_at_k(row["ranked_ids"], row["relevant_ids"], k)
                           for row in positive) if positive else None
             for k in ks
+        },
+        "micro_recall_at_k": {
+            str(k): recall_estimate(
+                sum(recall_counts_at_k(row["ranked_ids"], row["relevant_ids"], k)[0] for row in positive),
+                sum(len(set(row["relevant_ids"])) for row in positive),
+            ) for k in ks
         },
         "mrr": fmean(reciprocal_rank(row["ranked_ids"], row["relevant_ids"])
                      for row in positive) if positive else None,

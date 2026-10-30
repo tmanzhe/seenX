@@ -3,6 +3,7 @@
 import unittest
 
 from seenx.retrieval_metrics import recall_at_k, reciprocal_rank, summarize_queries
+from seenx.statistics import wilson_interval
 
 
 class RecallTests(unittest.TestCase):
@@ -58,6 +59,9 @@ class SummaryTests(unittest.TestCase):
         self.assertEqual(summary["positive_queries"], 3)
         self.assertAlmostEqual(summary["recall_at_k"]["1"], 1 / 3)
         self.assertAlmostEqual(summary["recall_at_k"]["2"], 0.5)
+        micro = summary["micro_recall_at_k"]["2"]
+        self.assertEqual((micro["hits"], micro["total"]), (2, 4))
+        self.assertEqual(micro["interval"], list(wilson_interval(2, 4)))
         self.assertAlmostEqual(summary["recall_at_k"]["3"], 2 / 3)
         self.assertAlmostEqual(summary["mrr"], 0.5)
         self.assertEqual(summary["no_match_queries"], 2)
@@ -70,6 +74,17 @@ class SummaryTests(unittest.TestCase):
         self.assertEqual(summary["recall_at_k"], {"5": None})
         self.assertIsNone(summary["mrr"])
         self.assertEqual(summary["no_match_false_positive_rate"], 0)
+
+    def test_micro_interval_uses_hit_counts_rather_than_fractional_macro_successes(self):
+        rows = [{"relevant_ids": ["a", "b", "c"], "ranked_ids": ["a", "a", "b"]},
+                {"relevant_ids": ["d"], "ranked_ids": []},
+                {"relevant_ids": [], "ranked_ids": ["false"]}]
+        summary = summarize_queries(rows, [2])
+        self.assertAlmostEqual(summary["recall_at_k"]["2"], 1 / 6)
+        estimate = summary["micro_recall_at_k"]["2"]
+        self.assertEqual(estimate["value"], 1 / 4)
+        self.assertEqual((estimate["hits"], estimate["total"]), (1, 4))
+        self.assertEqual(estimate["interval"], list(wilson_interval(1, 4)))
 
     def test_no_negative_labels_and_empty_population(self):
         summary = summarize_queries([{"relevant_ids": ["a"], "ranked_ids": ["a"]}], [1])

@@ -10,7 +10,9 @@ import sys
 
 from seenx.paths import CACHE_PATH
 from seenx.record_cache import open_cache
-from seenx.retrieval_metrics import recall_at_k, reciprocal_rank, summarize_queries
+from seenx.retrieval_metrics import (
+    recall_at_k, recall_counts_at_k, recall_estimate, reciprocal_rank, summarize_queries,
+)
 from seenx.search_files import search_files, select_paths
 from seenx.visual_search import (
     ClipEncoder, DEFAULT_MIN_SCORE, EXTENSIONS, MODEL_ID, MODEL_REVISION,
@@ -20,8 +22,10 @@ from seenx.visual_search import (
 
 MODES = {"lexical": "text", "visual": "visual", "hybrid": "hybrid"}
 INTERVAL_NOTE = (
-    "Wilson intervals unavailable: no shared Wilson interval helper exists in "
-    "the repository. No statistical interval implementation was added."
+    "95% Wilson score intervals accompany per-query and pooled micro recall counts. "
+    "Macro recall and MRR are unchanged and have no binomial interval. These are "
+    "descriptive intervals assuming independent relevant-item trials; repeated items "
+    "or correlated queries can make them optimistic."
 )
 
 
@@ -140,7 +144,8 @@ def evaluate(folder: Path, labels: dict, ks: list[int],
             "Image/page IDs are scored exactly; this evaluator does not retrieve or score saved regions or notes.",
             INTERVAL_NOTE,
         ],
-        "confidence_intervals": None,
+        "confidence_intervals": {"method": "wilson", "confidence": 0.95,
+                                 "scope": ["per_query_recall", "micro_recall"]},
         "modes": {},
     }
     if not any(row["relevant_ids"] for row in labels["queries"]):
@@ -172,6 +177,9 @@ def evaluate(folder: Path, labels: dict, ks: list[int],
                     "evidence": labeled["evidence"], "relevant_ids": relevant,
                     "ranked_ids": ranked_ids,
                     "recall_at_k": {str(k): recall_at_k(ranked_ids, relevant, k) for k in ks},
+                    "recall_at_k_estimates": {
+                        str(k): recall_estimate(*recall_counts_at_k(ranked_ids, relevant, k)) for k in ks
+                    },
                     "reciprocal_rank": reciprocal_rank(ranked_ids, relevant),
                     "no_match_false_positive": bool(ranked_ids) if not relevant else None,
                     "results": [
