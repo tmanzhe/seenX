@@ -6,16 +6,16 @@ The interface follows the seenX Design Proposal with a launcher flow: compact gl
 
 ## Build and open
 
-With Xcode installed, from the repository root:
+With Xcode and an Apple Development or Developer ID Application certificate installed, copy `apps/macos/signing.example.sh` to `apps/macos/signing.local.sh` and fill in your team and signing identity. The local file is ignored by git. You can also set `SEENX_DEVELOPMENT_TEAM` and `SEENX_CODE_SIGN_IDENTITY` in your environment; those values take priority. Use the same identity for debug and release builds.
+
+From the repository root:
 
 ```sh
 bash apps/macos/build.sh
 open apps/macos/.build/app/seenX.app
 ```
 
-The script creates an ad-hoc signed local development app. It prefers the existing full Xcode installation unless you set `DEVELOPER_DIR`; it does not change the system developer-tool selection. This is not a notarized release or a distributable download.
-
-Ad-hoc signatures can change when the app is rebuilt. macOS can then show an enabled Screen Recording entry while the running copy still lacks access. Quit the previous process and reopen the current app after a rebuild. For stable development authorization, set `SEENX_CODE_SIGN_IDENTITY` to an installed Apple Development/Developer ID signing identity when building; ad-hoc signing remains the fallback when none is supplied.
+The script requires signing configuration and checks the certificate type and team. It keeps the bundle ID `dev.seenx.native` and has no ad-hoc fallback, so rebuilds keep the same app identity for Screen Recording. It prefers the existing full Xcode installation unless you set `DEVELOPER_DIR`. This is a local build, not a notarized download. Quit the running copy before opening a rebuild.
 
 To run the focused behavior and storage checks:
 
@@ -42,15 +42,21 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcrun swift test --pack
 
 The screenshot shortcuts refer to the physical `=` and `-` keys on a US keyboard. They use Shift as part of the shortcut, so the visible characters are `+` and `_`. A conflicting shortcut is reported and the menu-bar actions remain available.
 
-The `seenX` menu-bar item provides the same actions, Open Library, Try a sample image, and Quit. An empty launcher offers capture and library commands; use arrows and Enter to run them. Opening a search result or the library navigates within the same panel, with a back button and preserved search context. The compact Actions menu holds secondary commands and the glass-background opacity control. Screen selection uses macOS's own screenshot tool. macOS may ask for Screen & System Audio Recording permission; no audio recording is used. Canceling the system selector does not create a memory.
+The `seenX` menu-bar item provides the same actions, Open Library, Try a sample image, and Quit. An empty launcher offers capture and library commands; use arrows and Enter to run them. Opening a search result or the library navigates within the same panel, with a back button and preserved search context. The compact Actions menu holds secondary commands and the glass-background opacity control. Drag to select a region within one display; Escape cancels. macOS may ask for Screen & System Audio Recording permission; no audio recording is used. Canceling selection does not create a memory.
 
 The app has no Dock icon. To quit without finding its menu-bar item, summon it with **⌘⇧K** and press **⌘Q**, or use **Actions → Quit seenX**. **Actions → Restart seenX** safely relaunches the current app bundle. Hiding the overlay keeps the app running.
 
 ## First run
 
-The welcome panel explains screen access before asking macOS for permission. Choose **Allow screen access**, **Try a sample image instead**, or the close button to set up later. The sample is an authored invoice image; it does not access the screen, and enters the library only if you explicitly save it. A denied screen permission can be enabled in System Settings. The recovery screen provides **Try again** (checks the actual capture API) and **Restart seenX** (protects any unsaved draft before relaunching). Returning from Settings automatically retries when the system reports a new grant. Search, the library, and sample annotations work without screen access.
+The welcome panel explains screen access before asking macOS for permission. Choose **Allow screen access**, **Try a sample image instead**, or the close button to set up later. The sample is an authored invoice image; it does not access the screen, and enters the library only if you explicitly save it. A denied screen permission can be enabled in System Settings. After a new grant, seenX shows **Permission granted, please relaunch** with a restart button. No capture runs until you relaunch. Search, the library, and sample annotations work without screen access.
 
-If Screen Recording is already enabled but access is still denied after reopening, remove the old seenX entry in System Settings and add this current app bundle again. The app never resets macOS privacy settings or grants itself access. Permission checks use ScreenCaptureKit metadata; screenshot pixels are read only after you choose a capture action and complete the system region selector. Capture failures now show their error instead of being silently treated as cancellation.
+If an old ad-hoc build left Screen Recording stuck, quit seenX and run this once, then open the signed app and allow access again:
+
+```sh
+tccutil reset ScreenCapture dev.seenx.native
+```
+
+Permission checks use `CGPreflightScreenCaptureAccess()` before capture and request access when needed. On macOS 14+, ScreenCaptureKit's `SCScreenshotManager` captures the selected region. The older system screenshot path stays as a fallback; this package still targets macOS 14+. Capture errors are shown, and cancellation saves nothing.
 
 ## Highlight and save
 
@@ -77,7 +83,7 @@ The app captures only after a deliberate capture action. Its panels are hidden d
 
 - Reconcile native capture storage with the catalog through an explicit import/write design preserving originals, OCR, notes, and highlights. Launcher retrieval now uses the existing search/fetch contract; captures are not automatically imported.
 - Character-level text selection, editable saved annotations, image import, and library deletion/organization.
-- ScreenCaptureKit capture adapter, supported source metadata, source permission management, portable backup/restore, and an opt-in read-only MCP bridge.
+- Supported source metadata, source permission management, portable backup/restore, and an opt-in read-only MCP bridge.
 - Verify Retina/multi-display selection, permission denial/revocation, shortcut conflicts, and alternate keyboard layouts on additional Macs before a release.
 - Shortcut customization; the current fixed shortcuts report registration conflicts and retain menu-bar fallbacks.
 - Signing/notarization, application licensing, and clean-machine distribution.
