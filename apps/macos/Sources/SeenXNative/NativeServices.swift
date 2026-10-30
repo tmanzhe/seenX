@@ -1,16 +1,26 @@
 import AppKit
 import Carbon
+import CoreGraphics
 import ScreenCaptureKit
 import Vision
 
 enum NativeServices {
-    /// Checks current capture authorization using the framework that consumes it.
-    /// Enumerating shareable content reads metadata only; it captures no pixels.
+    // A new grant may not apply to this process. Never capture until it relaunches.
+    @MainActor private static var requestedScreenAccess = false
+
+    @MainActor
     static func checkCaptureAccess() async throws {
-        _ = try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: true)
+        if CGPreflightScreenCaptureAccess() {
+            if requestedScreenAccess { throw ScreenAccessFailure.relaunchRequired }
+            return
+        }
+        requestedScreenAccess = true
+        if CGRequestScreenCaptureAccess() { throw ScreenAccessFailure.relaunchRequired }
+        throw ScreenAccessFailure.denied
     }
 
     static func isScreenPermissionError(_ error: Error) -> Bool {
+        if error as? ScreenAccessFailure == .denied { return true }
         var current: Error? = error
         // Framework errors can be wrapped by another operation. Bound traversal in
         // case an NSError contains a cyclic underlying-error graph.
@@ -106,12 +116,42 @@ enum NativeServices {
         return ranges
     }
 
-    /// The system picker handles region selection, display scaling and screen permissions.
-    /// A canceled picker produces no image and is never entered into the library.
+    /// A canceled selection produces no image and is never entered into the library.
+    @MainActor
     static func capture() async throws -> URL? {
+        try await checkCaptureAccess()
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("seenx-\(UUID().uuidString).png")
+        if #available(macOS 14.0, *) {
+            guard let selection = await ScreenRegionPicker().select() else { return nil }
+            // Let WindowServer remove the selection overlays before reading pixels.
+            try await Task.sleep(nanoseconds: 100_000_000)
+            let content = try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: true)
+            guard let display = content.displays.first(where: { $0.displayID == selection.displayID }) else {
+                throw CocoaError(.fileReadUnknown)
+            }
+            let filter = SCContentFilter(display: display, excludingWindows: [])
+            let configuration = SCStreamConfiguration()
+            configuration.sourceRect = selection.rect
+            let scale = CGFloat(filter.pointPixelScale)
+            configuration.width = max(1, Int((selection.rect.width * scale).rounded()))
+            configuration.height = max(1, Int((selection.rect.height * scale).rounded()))
+            configuration.showsCursor = false
+            // Recheck after selection in case access was revoked while it was open.
+            try await checkCaptureAccess()
+            let image = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: configuration)
+            guard let data = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]) else {
+                throw CaptureFailure.invalidImage
+            }
+            try data.write(to: url, options: .atomic)
+            return url
+        }
         return try await CaptureAttempt(imageURL: url).run()
     }
+}
+
+enum ScreenAccessFailure: Error, Equatable {
+    case denied
+    case relaunchRequired
 }
 
 final class GlobalHotKeys {
