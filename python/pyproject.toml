@@ -10,6 +10,7 @@ requires-python = ">=3.13"
 dependencies = ["Pillow>=13.0,<14", "pypdf>=6,<7"]
 
 [project.optional-dependencies]
+mcp = ["mcp>=1.28,<2"]
 ocr = ["pyobjc-framework-Vision>=11,<13; sys_platform == 'darwin'"]
 visual = ["torch>=2.6,<3", "transformers>=5.10,<6"]
 
@@ -20,6 +21,7 @@ seenx-search = "seenx.search_files:main"
 seenx-eval = "seenx.retrieval_eval:main"
 seenx-memory = "seenx.memory_cli:main"
 seenx-engine = "seenx.engine_stdio:main"
+seenx-mcp = "seenx.mcp_stdio:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
