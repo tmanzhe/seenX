@@ -5,6 +5,7 @@ from io import BytesIO
 import json
 from pathlib import Path
 import sqlite3
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -12,7 +13,7 @@ from unittest.mock import patch
 from seenx.catalog import Catalog
 from seenx.catalog_ocr import persist_observations
 from seenx.engine_contract import Engine, MAX_REQUEST_BYTES
-from seenx.engine_stdio import serve
+from seenx.engine_stdio import main as engine_main, serve
 from seenx.image_ocr import COORDINATE_SPACE
 from seenx.observability import configure_logging
 
@@ -41,7 +42,7 @@ class FakeImage:
         destination.write(b"encoded-existing-pixels")
 
 
-class EngineContractTests(unittest.TestCase):
+class EngineFixture(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -52,7 +53,7 @@ class EngineContractTests(unittest.TestCase):
         self.addCleanup(self.catalog.connection.close)
         self.imported = self.import_source(self.source)
         self.note = self.catalog.add_note(self.imported["revision_id"], "Keep this spacing", region=[0.1, 0.2, 0.3, 0.1])
-        self.engine = Engine(self.catalog)
+        self.engine = Engine(self.catalog, trusted_local=True)
 
     def import_source(self, path):
         with patch("seenx.catalog.Image.open") as opened, patch("seenx.catalog.ImageOps.exif_transpose") as oriented:
@@ -68,6 +69,8 @@ class EngineContractTests(unittest.TestCase):
     def request(self, method="engine.info", params=None, **overrides):
         return json.loads(self.engine.handle(self.frame(method, params, **overrides)))
 
+
+class EngineContractTests(EngineFixture):
     def test_info_and_search_have_stable_ids_and_trace_correlation(self):
         info = self.request()
         self.assertEqual(info["version"], 1)
@@ -220,6 +223,161 @@ class EngineContractTests(unittest.TestCase):
         serve(self.engine, incoming, outgoing)
         replies = [json.loads(line) for line in outgoing.getvalue().splitlines()]
         self.assertEqual([reply["id"] for reply in replies], ["one", "two"])
+
+
+class EngineGrantTests(EngineFixture):
+    def setUp(self):
+        super().setUp()
+        self.engine = Engine(self.catalog, principal_id="assistant-a")
+        other = self.root / "private.image"
+        other.write_bytes(b"private snapshot")
+        self.private = self.import_source(other)
+        self.private_note = self.catalog.add_note(self.private["revision_id"], "Keep this spacing private-sentinel")
+
+    def test_default_and_ungranted_principals_deny_all_evidence(self):
+        for engine in (Engine(self.catalog), self.engine, Engine(self.catalog, principal_id="assistant-b")):
+            self.engine = engine
+            self.assertEqual(self.request("memory.search", {"query": "spacing"})["result"], [])
+            response = self.request("memory.fetch", {"asset_id": self.imported["asset_id"]})
+            self.assertEqual(response["error"]["code"], "access_denied")
+        # A grant to a named principal never authorizes an anonymous caller.
+        self.catalog.access.grant_source("assistant-a", self.imported["asset_id"])
+        self.engine = Engine(self.catalog)
+        self.assertEqual(self.request("memory.search", {"query": "spacing"})["result"], [])
+
+    def test_source_grant_allows_search_memory_and_saved_region(self):
+        self.catalog.access.grant_source("assistant-a", self.imported["asset_id"])
+        hits = self.request("memory.search", {"query": "spacing"})["result"]
+        self.assertEqual([hit["asset_id"] for hit in hits], [self.imported["asset_id"]])
+        memory = self.request("memory.fetch", {"asset_id": self.imported["asset_id"]})["result"]
+        self.assertEqual(memory["annotations"][0]["id"], self.note["annotation_id"])
+        region = self.request("region.fetch", {**self.imported_ids(), "region_id": self.note["region_id"]})
+        self.assertEqual(region["result"]["annotation"]["id"], self.note["annotation_id"])
+
+    def imported_ids(self):
+        return {key: self.imported[key] for key in ("asset_id", "revision_id")}
+
+    def test_source_revoke_removes_search_and_fetch_on_existing_session(self):
+        self.catalog.access.grant_source("assistant-a", self.imported["asset_id"])
+        self.assertIn("result", self.request("memory.fetch", self.imported_ids()))
+        self.catalog.access.revoke_source("assistant-a", self.imported["asset_id"])
+        self.assertEqual(self.request("memory.search", {"query": "spacing"})["result"], [])
+        self.assertEqual(self.request("memory.fetch", self.imported_ids())["error"]["code"], "access_denied")
+        self.assertEqual(self.request("region.fetch", {**self.imported_ids(), "region_id": self.note["region_id"]})
+                         ["error"]["code"], "access_denied")
+
+    def test_ungranted_memory_and_region_ids_are_refused_before_evidence_reads(self):
+        self.catalog.access.grant_source("assistant-a", self.imported["asset_id"])
+        private_ids = {key: self.private[key] for key in ("asset_id", "revision_id")}
+        cases = [("memory.fetch", {**private_ids, "include_image": True}),
+                 ("region.fetch", {**private_ids, "region_id": self.private_note["region_id"], "include_image": True}),
+                 ("region.fetch", {**private_ids, "observation_id": "guessed-observation", "include_image": True}),
+                 ("memory.fetch", {"asset_id": "unknown-asset"})]
+        with patch.object(self.catalog, "get_memory") as read, patch.object(self.engine, "_image") as image:
+            for method, params in cases:
+                response = self.request(method, params)
+                self.assertEqual(response["error"]["code"], "access_denied")
+                self.assertNotIn("private-sentinel", json.dumps(response))
+            read.assert_not_called()
+            image.assert_not_called()
+
+    def test_search_filters_never_override_grants_and_limit_applies_after_authorization(self):
+        self.catalog.edit_note(self.note["annotation_id"], note="spacing " + "filler " * 100)
+        for _ in range(105):
+            self.catalog.add_note(self.private["revision_id"], "spacing")
+        self.catalog.access.grant_source("assistant-a", self.imported["asset_id"])
+        for options in ({}, {"match": "all"}, {"current_only": True}, {"limit": 1}):
+            response = self.request("memory.search", {"query": "spacing", **options})
+            self.assertEqual([hit["asset_id"] for hit in response["result"]], [self.imported["asset_id"]])
+            self.assertNotIn("private-sentinel", json.dumps(response))
+        for options in ({"asset_id": self.private["asset_id"]}, {"revision_id": self.private["revision_id"]}):
+            self.assertEqual(self.request("memory.search", {"query": "spacing", **options})["result"], [])
+
+    def test_search_grants_cover_notes_selected_text_and_ocr_without_leaking_private_fields(self):
+        for imported in (self.imported, self.private):
+            self.catalog.add_note(imported["revision_id"], selected_text="spacing selection")
+            persist_observations(self.catalog, imported["revision_id"], {
+                "configuration": {"engine": "test"}, "width": 100, "height": 200,
+                "coordinate_space": COORDINATE_SPACE,
+                "observations": [{"text": "spacing recognized", "confidence": 0.9,
+                                  "box": {"x": 0.1, "y": 0.2, "width": 0.3, "height": 0.1}}],
+            })
+        self.catalog.access.grant_source("assistant-a", self.imported["asset_id"])
+        hits = self.request("memory.search", {"query": "spacing"})["result"]
+        self.assertEqual({hit["matched_field"] for hit in hits}, {"note", "selected_text", "ocr"})
+        self.assertEqual({hit["asset_id"] for hit in hits}, {self.imported["asset_id"]})
+
+    def test_principal_and_trust_cannot_be_supplied_in_wire_parameters(self):
+        self.catalog.access.grant_source("assistant-b", self.private["asset_id"])
+        for options in ({"principal_id": "assistant-b"}, {"trusted_local": True}):
+            self.assertEqual(self.request("memory.search", {"query": "spacing", **options})["error"]["code"],
+                             "invalid_parameters")
+        self.assertEqual(self.request("memory.search", {"query": "spacing"})["result"], [])
+        self.assertEqual(self.request("grant", {})["error"]["code"], "unknown_method")
+
+    def test_collection_grant_membership_removal_and_revoke_are_live(self):
+        collection = self.catalog.access.create_collection("Shared")
+        self.catalog.access.add_member(collection, self.imported["asset_id"])
+        self.catalog.access.grant_collection("assistant-a", collection)
+        self.assertIn("result", self.request("memory.fetch", self.imported_ids()))
+        self.assertEqual(len(self.request("memory.search", {"query": "spacing"})["result"]), 1)
+        self.catalog.access.remove_member(collection, self.imported["asset_id"])
+        self.assertEqual(self.request("memory.fetch", self.imported_ids())["error"]["code"], "access_denied")
+        # Membership is dynamic: adding an asset to a granted collection authorizes it.
+        self.catalog.access.add_member(collection, self.private["asset_id"])
+        self.assertEqual(self.request("memory.search", {"query": "spacing"})["result"][0]["asset_id"],
+                         self.private["asset_id"])
+        self.catalog.access.revoke_collection("assistant-a", collection)
+        self.assertEqual(self.request("memory.search", {"query": "spacing"})["result"], [])
+        self.assertEqual(self.request("memory.fetch", {"asset_id": self.private["asset_id"]})["error"]["code"],
+                         "access_denied")
+
+    def test_grants_are_principal_specific_and_alternative_grants_form_a_union(self):
+        collection = self.catalog.access.create_collection("Shared")
+        self.catalog.access.add_member(collection, self.imported["asset_id"])
+        self.catalog.access.grant_collection("assistant-a", collection)
+        self.catalog.access.grant_source("assistant-a", self.imported["asset_id"])
+        self.catalog.access.revoke_source("assistant-a", self.imported["asset_id"])
+        self.assertIn("result", self.request("memory.fetch", self.imported_ids()))
+        self.engine = Engine(self.catalog, principal_id="assistant-b")
+        self.assertEqual(self.request("memory.fetch", self.imported_ids())["error"]["code"], "access_denied")
+
+    def test_grants_persist_across_reopen_and_cover_all_source_revisions(self):
+        self.catalog.access.grant_source("assistant-a", self.imported["asset_id"])
+        collection = self.catalog.access.create_collection("Shared")
+        self.catalog.access.add_member(collection, self.private["asset_id"])
+        self.catalog.access.grant_collection("assistant-a", collection)
+        self.source.write_bytes(b"changed source")
+        current = self.import_source(self.source)
+        self.assertEqual(current["asset_id"], self.imported["asset_id"])
+        with Catalog(self.catalog.root) as reopened:
+            self.engine = Engine(reopened, principal_id="assistant-a")
+            for params in (self.imported_ids(), {"asset_id": current["asset_id"]},
+                           {"asset_id": self.private["asset_id"]}):
+                self.assertIn("result", self.request("memory.fetch", params))
+            reopened.access.revoke_source("assistant-a", self.imported["asset_id"])
+        self.engine = Engine(self.catalog, principal_id="assistant-a")
+        self.assertEqual(self.request("memory.fetch", self.imported_ids())["error"]["code"], "access_denied")
+
+    def test_trusted_local_app_retains_whole_library_access_without_grants(self):
+        self.engine = Engine(self.catalog, trusted_local=True)
+        self.assertEqual(len(self.request("memory.search", {"query": "spacing"})["result"]), 2)
+        self.assertIn("result", self.request("memory.fetch", {"asset_id": self.private["asset_id"]}))
+
+    def test_stdio_launch_binds_access_without_request_supplied_identity(self):
+        self.catalog.access.grant_source("assistant-a", self.imported["asset_id"])
+        for flags, expected in (([], []), (["--principal", "assistant-a"], [self.imported["asset_id"]]),
+                                (["--principal", "assistant-b"], []),
+                                (["--trusted-local"], [self.imported["asset_id"], self.private["asset_id"]])):
+            outgoing = BytesIO()
+            arguments = ["seenx-engine", "--library", str(self.catalog.root), "--no-log", *flags]
+            with self.subTest(flags=flags), patch.object(sys, "argv", arguments):
+                with patch("seenx.engine_stdio.sys.stdin") as incoming_stream, patch("seenx.engine_stdio.sys.stdout") as outgoing_stream:
+                    incoming_stream.buffer = BytesIO(self.frame("memory.search", {"query": "spacing"}))
+                    outgoing_stream.buffer = outgoing
+                    engine_main()
+            response = json.loads(outgoing.getvalue())
+            self.assertEqual({hit["asset_id"] for hit in response["result"]}, set(expected))
 
 
 if __name__ == "__main__":

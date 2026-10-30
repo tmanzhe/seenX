@@ -1,4 +1,4 @@
-"""Version-1 read-only contract for a trusted local app, not an MCP server."""
+"""Version-1 read-only contract with owner-bound caller access; no MCP server."""
 
 import base64
 import hashlib
@@ -11,6 +11,7 @@ import sqlite3
 from PIL import Image, ImageOps
 
 from seenx.catalog import SCHEMA_VERSION, pixel_edge
+from seenx.catalog_access import identifier
 from seenx.observability import count, event, run_context
 
 
@@ -72,12 +73,20 @@ class LimitedImageBuffer(BytesIO):
 
 
 class Engine:
-    def __init__(self, catalog):
+    def __init__(self, catalog, *, principal_id: str | None = None, trusted_local: bool = False):
+        # Caller identity/trust comes from the host, never request JSON.
+        if type(trusted_local) is not bool or (trusted_local and principal_id is not None):
+            raise ValueError("Choose either a grant-scoped principal or trusted local access")
         self.catalog = catalog
+        self.principal_id = identifier(principal_id) if principal_id is not None else None
+        self.trusted_local = trusted_local
 
     def _memory(self, params: dict) -> dict:
         asset_id = _identifier(params.get("asset_id"), "asset_id")
         revision_id = _identifier(params["revision_id"], "revision_id") if "revision_id" in params else None
+        if not self.trusted_local and not self.catalog.access.allows(self.principal_id, asset_id):
+            # Refuse before looking at revision IDs, snapshots, notes, or targets.
+            raise EngineError("access_denied", "Requested memory is not granted to this caller")
         row = self.catalog.connection.execute("""
             SELECT r.sha256 FROM assets a JOIN revisions r
               ON r.id = coalesce(?, a.current_revision_id) AND r.asset_id = a.id
@@ -134,7 +143,8 @@ class Engine:
                     _identifier(params[name], name)
             return self.catalog.search(params["query"], match=params.get("match", "phrase"),
                 limit=params.get("limit", 20), asset_id=params.get("asset_id"),
-                revision_id=params.get("revision_id"), current_only=_boolean(params, "current_only"))
+                revision_id=params.get("revision_id"), current_only=_boolean(params, "current_only"),
+                principal_id=self.principal_id, trusted_local=self.trusted_local)
         if method == "memory.fetch":
             _fields(params, {"asset_id", "revision_id", "include_image"}, {"asset_id"})
             include_image = _boolean(params, "include_image")

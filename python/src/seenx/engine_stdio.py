@@ -1,4 +1,4 @@
-"""Bounded JSON-lines transport for the trusted local read-only engine contract."""
+"""Bounded JSON-lines transport; caller access is fixed at process startup."""
 
 import argparse
 from pathlib import Path
@@ -33,6 +33,9 @@ def serve(engine: Engine, incoming, outgoing) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--library", type=Path, default=LIBRARY_ROOT)
+    caller = parser.add_mutually_exclusive_group()
+    caller.add_argument("--principal", help="Owner-bound grant principal; not an authentication mechanism")
+    caller.add_argument("--trusted-local", action="store_true", help="Owner-selected first-party whole-library access")
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--no-log", action="store_true")
     args = parser.parse_args()
@@ -40,7 +43,8 @@ def main() -> None:
         configure_logging(enabled=not args.no_log, debug=args.debug)
         with Catalog(args.library) as catalog:
             event("engine_started", protocol_version=1)
-            serve(Engine(catalog), sys.stdin.buffer, sys.stdout.buffer)
+            serve(Engine(catalog, principal_id=args.principal, trusted_local=args.trusted_local),
+                  sys.stdin.buffer, sys.stdout.buffer)
             event("engine_stopped")
     except BrokenPipeError:
         return
