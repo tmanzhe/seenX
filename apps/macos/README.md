@@ -73,7 +73,11 @@ Choose **Connect catalog…** in the launcher, select the prepared seenX reposit
 
 ## Storage and boundaries
 
-The menu-bar action **Open Python Library…** opens a separate read-only development browser. Click **Connect…**, choose the seenX repository with its prepared Python environment, and then choose an existing Python library folder containing `catalog.sqlite3`. Search saved notes/selections/OCR, select evidence to fetch its exact image, and switch to a saved-region crop. Full-image previews mark the matching target. Helper failures disconnect safely and preserve the typed query; closing the browser closes its connection. See [the step-by-step integration lesson](../../docs/native-engine.md) for setup, limits, tests, and the rationale.
+The menu-bar action **Open Python Library…** opens a separate development browser. Click **Connect…**, choose the seenX repository with its prepared Python environment, and then choose an existing Python library folder containing `catalog.sqlite3`. Search saved notes/selections/OCR, select evidence to fetch its exact image, and switch to a saved-region crop. Helper failures disconnect safely and preserve the typed query; closing the browser closes its connection. See [the step-by-step integration lesson](../../docs/native-engine.md) for setup, limits, tests, and the rationale.
+
+Both catalog detail views support **New region**: drag a rectangle on the full image, enter a note, then **Save**. Click an existing region or its button below the image to edit its note, **Redraw** its rectangle, or **Delete** it. **Cancel** discards the draft. Regions use normalized top-left coordinates on the exact oriented revision and persist in the Python catalog, including its search index. Edits preserve existing selected text and OCR provenance. Save or cancel before switching regions or image modes; navigation away or disconnecting discards a catalog draft.
+
+Select a saved region, choose **Region crop** or **Full image**, and click **Copy for LLM**. The clipboard receives the H3 version-1 JSON payload from Python: metadata text and base64 PNG content, including saved notes, coordinates, revision IDs, and provenance. Copy requires saved changes and reports success only after writing the clipboard. Engine errors retain the previous clipboard. This action is local and makes no model/API call. Connections request `--trusted-local --allow-writes`; a helper launched separately without write capabilities can still browse, with unsupported actions disabled. A helper predating the startup flag must be updated before connecting through the app.
 
 Screenshots and an atomically written `library.json` manifest live in `~/Library/Application Support/seenX Native/`. Restarting the app reloads this library. These files are separate from the Python catalog and the website's sample data. There is no cloud upload, assistant connection, or automatic access to other folders in this slice.
 
@@ -82,7 +86,7 @@ The app captures only after a deliberate capture action. Its panels are hidden d
 ## Remaining integration
 
 - Reconcile native capture storage with the catalog through an explicit import/write design preserving originals, OCR, notes, and highlights. Launcher retrieval now uses the existing search/fetch contract; captures are not automatically imported.
-- Character-level text selection, editable saved annotations, image import, and library deletion/organization.
+- Character-level text selection, editable saved native captures, image import, and library deletion/organization.
 - Supported source metadata, source permission management, portable backup/restore, and an opt-in read-only MCP bridge.
 - Verify Retina/multi-display selection, permission denial/revocation, shortcut conflicts, and alternate keyboard layouts on additional Macs before a release.
 - Shortcut customization; the current fixed shortcuts report registration conflicts and retain menu-bar fallbacks.
