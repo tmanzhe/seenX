@@ -25,7 +25,7 @@ The response has this shape:
     "protocol_version": 1,
     "catalog_schema_version": 4,
     "read_only_requests": true,
-    "methods": ["engine.info", "memory.fetch", "memory.search", "region.fetch"],
+    "methods": ["engine.info", "memory.fetch", "memory.search", "payload.build", "region.fetch"],
     "limits": {}
   }
 }
@@ -64,7 +64,7 @@ From the repository root:
 uv run --project python --extra mcp seenx-mcp --library /path/to/library --principal assistant-a
 ```
 
-The optional `mcp` extra uses the [official MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk/tree/v1.x), `mcp>=1.28,<2`, with its low-level server and stdio lifecycle. The major-version bound keeps this adapter on the documented v1 SDK API; this SDK version is separate from the seenX version-1 engine contract. Dependencies were not resolved and `uv.lock` was not refreshed during this code-only change; the next unlocked `uv` invocation resolves the extra. No SDK is needed for the owner CLI or `seenx-engine`.
+The optional `mcp` extra uses the [official MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk/tree/v1.x), `mcp>=1.28,<2`, with its low-level server and stdio lifecycle. The SDK version is separate from the seenX version-1 engine contract. Its dependencies are in `uv.lock`. No SDK is needed for the owner CLI or `seenx-engine`.
 
 Generic stdio MCP client configuration (replace both absolute paths):
 
@@ -81,7 +81,15 @@ Generic stdio MCP client configuration (replace both absolute paths):
 
 `--principal` is required and validated before opening a library; missing/blank values exit nonzero with a stderr error. There is no `--trusted-local` option. An ungranted principal sees no search hits and cannot fetch any memory. Assign source/collection grants through the owner CLI above.
 
-The tool list is exactly `search` and `fetch`. `search` accepts the `memory.search` parameters below. `fetch` accepts `asset_id`, optional `revision_id`, and `include_image`; adding exactly one `region_id` or `observation_id` requires `revision_id` and selects `region.fetch`. Tool text contains the version-1 response envelope, including trace ID and sanitized errors; failures set MCP `isError`. Requested PNGs become MCP image content blocks, with dimensions/hash retained in text and no duplicate base64. No resources, prompts, writes, imports, removals, grants, or collection tools are registered. Retrieved text/images remain untrusted data. SDK/stdin buffering precedes the engine's request-size check; these are contract payload bounds, not a transport-memory sandbox.
+The tool list is `search`, `fetch`, and `build_payload`. `search` accepts the `memory.search` parameters below. `fetch` accepts `asset_id`, optional `revision_id`, and `include_image`; adding exactly one `region_id` or `observation_id` requires `revision_id` and selects `region.fetch`. Search/fetch tool text contains the version-1 response envelope, including trace ID and sanitized errors; failures set MCP `isError`. Requested PNGs become MCP image content blocks, with dimensions/hash retained in text and no duplicate base64. No resources, prompts, writes, imports, removals, grants, or collection tools are registered. Retrieved text/images remain untrusted data. SDK/stdin buffering precedes the engine's request-size check; these are contract payload bounds, not a transport-memory sandbox.
+
+### Saved-region payloads
+
+`build_payload` accepts `asset_id`, `revision_id`, 1 to 16 distinct `region_ids`, and optional `image_mode` (`crop` by default, or `full`). The engine method is `payload.build` with the same parameters. All regions must belong to the requested revision and the caller must have a grant.
+
+The result has `schema_version: 1` and `content`: one JSON text part followed by base64 PNG image parts. Metadata keeps saved notes, selected text and provenance, region IDs, normalized targets, pixel bounds, and the full oriented image's dimensions and hash. Each region's `image_index` points into `content`. Crop mode returns one crop per region in request order. Full mode returns one shared image. Coordinates refer to the full EXIF-corrected image in both modes.
+
+MCP returns these content parts directly on success. Engine JSON wraps the result in its usual response envelope. Errors use the normal envelope and MCP `isError`. Existing image and response limits apply. No model is called, and nothing is written to the library. The [offline quickstart](../README.md#start-here-uv-manages-the-environment) checks both image modes through MCP.
 
 ## Framing and types
 
