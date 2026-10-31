@@ -47,7 +47,8 @@ class CatalogSearchTests(unittest.TestCase):
         self.catalog.connection.commit()
 
     def test_note_search_survives_restart_and_points_to_exact_annotation(self):
-        saved = self.catalog.add_note(self.revision, "Keep this spacing", region=[0.1, 0.2, 0.3, 0.1])
+        note = "Keep this spacing\nwith café accents"
+        saved = self.catalog.add_note(self.revision, note, region=[0.1, 0.2, 0.3, 0.1])
         with Catalog(self.library) as reopened:
             results = reopened.search("keep this spacing", trusted_local=True)
         self.assertEqual(len(results), 1)
@@ -55,11 +56,51 @@ class CatalogSearchTests(unittest.TestCase):
         self.assertEqual(result["annotation_id"], saved["annotation_id"])
         self.assertEqual(result["asset_id"], self.imported["asset_id"])
         self.assertEqual(result["revision_id"], self.revision)
+        self.assertEqual(result["region_id"], saved["region_id"])
+        self.assertEqual(result["note"], note)
         self.assertEqual(result["matched_field"], "note")
-        self.assertEqual(result["target"]["x"], 0.1)
+        self.assertEqual(result["target"],
+                         {"kind": "region", "x": 0.1, "y": 0.2, "width": 0.3, "height": 0.1})
         self.assertEqual(result["provenance"], {"origin": "user", "confirmation": "confirmed"})
         self.assertIn("spacing", result["excerpt"].casefold())
         self.assertEqual(result["score_direction"], "lower_is_better")
+        self.assert_index_consistent()
+
+    def test_region_note_and_geometry_edits_and_deletion_survive_reopen(self):
+        saved = self.catalog.add_note(self.revision, "Original spacing", region=[0, 0, 1, 1])
+        other = self.catalog.add_note(self.revision, "Other spacing", region=[0.5, 0.5, 0.5, 0.5])
+        self.catalog.edit_note(saved["annotation_id"], region=[0.1, 0.2, 0.3, 0.4])
+        result, = self.catalog.search("original", trusted_local=True)
+        self.assertEqual(result["note"], "Original spacing")
+        self.assertEqual(result["target"],
+                         {"kind": "region", "x": 0.1, "y": 0.2, "width": 0.3, "height": 0.4})
+        self.catalog.edit_note(saved["annotation_id"], note="Replacement spacing", region=[0, 0, 0.2, 0.3])
+        self.assertEqual(self.catalog.search("original", trusted_local=True), [])
+        result, = self.catalog.search("replacement", trusted_local=True)
+        self.assertEqual(result["annotation_id"], saved["annotation_id"])
+        self.assertEqual(result["region_id"], saved["region_id"])
+        self.assertEqual(result["revision_id"], self.revision)
+        self.assertEqual(result["note"], "Replacement spacing")
+        self.assertEqual(result["target"],
+                         {"kind": "region", "x": 0, "y": 0, "width": 0.2, "height": 0.3})
+        with Catalog(self.library) as reopened:
+            self.assertEqual(reopened.search("original", trusted_local=True), [])
+            self.assertEqual(reopened.search("replacement", trusted_local=True), [result])
+            self.assertTrue(reopened.delete_note(saved["annotation_id"]))
+        with Catalog(self.library) as reopened:
+            self.assertEqual(reopened.search("replacement", trusted_local=True), [])
+            remaining, = reopened.search("spacing", trusted_local=True)
+            self.assertEqual(remaining["region_id"], other["region_id"])
+            self.assertEqual(remaining["note"], "Other spacing")
+        self.assert_index_consistent()
+
+    def test_clearing_note_removes_its_terms_and_returns_empty_note_for_selection(self):
+        saved = self.catalog.add_note(self.revision, "Remove wording", "Keep quotation", region=[0, 0, 1, 1])
+        self.catalog.edit_note(saved["annotation_id"], note="")
+        self.assertEqual(self.catalog.search("remove wording", trusted_local=True), [])
+        result, = self.catalog.search("keep quotation", trusted_local=True)
+        self.assertEqual(result["region_id"], saved["region_id"])
+        self.assertEqual(result["note"], "")
         self.assert_index_consistent()
 
     def test_selected_text_and_ocr_keep_separate_evidence_and_provenance(self):
@@ -67,6 +108,8 @@ class CatalogSearchTests(unittest.TestCase):
         saved = self.catalog.add_note(self.revision, "This button", observation_id=observation["id"])
         results = self.catalog.search("continue to checkout", trusted_local=True)
         self.assertEqual({result["matched_field"] for result in results}, {"selected_text", "ocr"})
+        self.assertEqual(next(result for result in results if result["matched_field"] == "selected_text")["note"], "This button")
+        self.assertIsNone(next(result for result in results if result["matched_field"] == "ocr")["note"])
         self.assertTrue(all(result["observation_id"] == observation["id"] for result in results))
         self.assertTrue(all(result["provenance"]["confirmation"] == "unverified" for result in results))
         self.assertEqual(next(result for result in results if result["matched_field"] == "selected_text")["annotation_id"], saved["annotation_id"])
@@ -192,7 +235,7 @@ class SearchMigrationTests(unittest.TestCase):
             connection.execute("INSERT INTO assets VALUES ('asset', '/missing.png', NULL, 'old-time')")
             connection.execute("INSERT INTO revisions VALUES ('revision', 'asset', ?, 100, 200, 'PNG', 1, ?, 'old-time')", (digest, len(payload)))
             connection.execute("UPDATE assets SET current_revision_id = 'revision'")
-            connection.execute("INSERT INTO regions VALUES ('region', 'revision', 'whole', 0, 0, 1, 1)")
+            connection.execute("INSERT INTO regions VALUES ('region', 'revision', 'region', 0.1, 0.2, 0.3, 0.4)")
             connection.execute("""INSERT INTO annotations(id, region_id, note, selected_text, origin, confirmation, created_at, updated_at)
                 VALUES ('note', 'region', 'Legacy thought', 'Selected quotation', 'user', 'confirmed', 'old-time', 'old-time')""")
             connection.execute("INSERT INTO ocr_runs VALUES ('run', 'revision', 'config', '{\"engine\":\"test\"}', 'old-time')")
@@ -202,12 +245,18 @@ class SearchMigrationTests(unittest.TestCase):
     def test_existing_version_two_sources_are_backfilled_without_id_changes(self):
         with Catalog(self.root) as catalog:
             self.assertEqual(catalog.connection.execute("PRAGMA user_version").fetchone()[0], SCHEMA_VERSION)
-            self.assertEqual(catalog.search("legacy thought", trusted_local=True)[0]["annotation_id"], "note")
+            result, = catalog.search("legacy thought", trusted_local=True)
+            self.assertEqual(result["annotation_id"], "note")
+            self.assertEqual(result["region_id"], "region")
+            self.assertEqual(result["revision_id"], "revision")
+            self.assertEqual(result["note"], "Legacy thought")
+            self.assertEqual(result["target"],
+                             {"kind": "region", "x": 0.1, "y": 0.2, "width": 0.3, "height": 0.4})
             self.assertEqual(catalog.search("selected quotation", trusted_local=True)[0]["matched_field"], "selected_text")
             self.assertEqual(catalog.search("recognized evidence", trusted_local=True)[0]["observation_id"], "observation")
             self.assertEqual(catalog.get_memory("asset", trusted_local=True)["annotations"][0]["created_at"], "old-time")
         with Catalog(self.root) as catalog:
-            self.assertEqual(len(catalog.search("legacy thought", trusted_local=True)), 1)
+            self.assertEqual(catalog.search("legacy thought", trusted_local=True), [result])
 
     def test_failed_fts_migration_rolls_back_and_can_be_retried(self):
         with patch("seenx.catalog_migrations.V3_STATEMENTS", (*V3_STATEMENTS[:5], "INVALID SQL")):
