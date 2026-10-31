@@ -36,6 +36,12 @@ final class EngineBrowserModel: ObservableObject {
     @Published private(set) var connected = false
     @Published private(set) var searched = false
     @Published private(set) var error: String?
+    @Published var regionDraft: CatalogRegionDraft?
+    @Published var drawingRegion = false
+    @Published var payloadImageMode = "crop"
+    @Published private(set) var copyStatus: String?
+    @Published private(set) var canEditRegions = false
+    @Published private(set) var canCopyPayload = false
     private var client: EngineClient?
     // Closing/reconnecting invalidates outstanding completions before they touch UI.
     private var generation = UUID()
@@ -73,7 +79,8 @@ final class EngineBrowserModel: ObservableObject {
 
     func connect(interpreter: URL, repository: URL, library: URL) {
         connect(configuration: .init(executableURL: interpreter,
-            arguments: ["-m", "seenx.engine_stdio", "--library", library.path, "--trusted-local"], currentDirectoryURL: repository))
+            arguments: ["-m", "seenx.engine_stdio", "--library", library.path, "--trusted-local", "--allow-writes"],
+            currentDirectoryURL: repository, allowsWrites: true))
     }
 
     func connect(configuration: EngineClient.Configuration) {
@@ -86,6 +93,8 @@ final class EngineBrowserModel: ObservableObject {
                 guard generation == token else { await session.close(); return }
                 client = session
                 connected = true
+                canEditRegions = session.canWriteAnnotations
+                canCopyPayload = session.info.methods.contains("payload.build")
             } catch {
                 guard generation == token else { return }
                 report(error)
@@ -108,6 +117,9 @@ final class EngineBrowserModel: ObservableObject {
         memory = nil
         image = nil
         showingCrop = false
+        cancelRegionDraft()
+        canEditRegions = false
+        canCopyPayload = false
         searched = false
         error = nil
         Task { await previous?.close() }
@@ -122,6 +134,7 @@ final class EngineBrowserModel: ObservableObject {
         selected = nil
         memory = nil
         image = nil
+        cancelRegionDraft()
         searched = false
         if connected { error = nil }
         guard !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
@@ -147,6 +160,7 @@ final class EngineBrowserModel: ObservableObject {
         selected = nil
         memory = nil
         image = nil
+        cancelRegionDraft()
         Task {
             do {
                 let results = try await client.search(requestedQuery, limit: 30)
@@ -163,29 +177,155 @@ final class EngineBrowserModel: ObservableObject {
 
     func open(_ hit: SearchHit, crop: Bool = false) {
         guard !busy, let client else { return }
+        let cropRegionID = selected?.id == hit.id ? (selectedAnnotation?.regionID ?? hit.regionID) : hit.regionID
         let token = generation
         busy = true
         error = nil
         selected = hit
         image = nil
         memory = nil
+        cancelRegionDraft()
         showingCrop = crop
         Task {
             do {
                 if crop {
                     let reference: RegionReference
-                    if let region = hit.regionID { reference = .region(region) }
+                    if let region = cropRegionID { reference = .region(region) }
                     else if let observation = hit.observationID { reference = .observation(observation) }
                     else { throw EngineClientError.invalidResponse }
                     let result = try await client.fetchRegion(assetID: hit.assetID, revisionID: hit.revisionID,
                                                               target: reference, includeImage: true)
                     guard generation == token else { return }
-                    image = try decodeImage(result.image)
+                    if selected?.id == hit.id { image = try decodeImage(result.image) }
                 } else {
                     let result = try await client.fetchMemory(assetID: hit.assetID, revisionID: hit.revisionID, includeImage: true)
                     guard generation == token else { return }
-                    memory = result
-                    image = try decodeImage(result.image)
+                    if selected?.id == hit.id {
+                        memory = result
+                        image = try decodeImage(result.image)
+                        selectAnnotation(result.annotations.first { $0.id == hit.annotationID })
+                    }
+                }
+            } catch {
+                guard generation == token else { return }
+                report(error)
+            }
+            guard generation == token else { return }
+            finishRequest()
+        }
+    }
+
+    var selectedAnnotation: Annotation? {
+        memory?.annotations.first { $0.id == regionDraft?.annotationID }
+    }
+
+    var hasSavedCrop: Bool {
+        if selectedAnnotation != nil || selected?.observationID != nil { return true }
+        guard let regionID = selected?.regionID else { return false }
+        return memory.map { $0.annotations.contains { $0.regionID == regionID } } ?? true
+    }
+
+    var hasRegionChanges: Bool {
+        guard let draft = regionDraft else { return false }
+        guard let annotation = selectedAnnotation else { return true }
+        return draft.note != annotation.note || draft.geometryChanged
+    }
+
+    var canSaveRegion: Bool {
+        guard let draft = regionDraft, hasRegionChanges, !drawingRegion else { return false }
+        let hasText = !draft.note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !(selectedAnnotation?.selectedText.isEmpty ?? true)
+        return hasText && (draft.annotationID != nil || draft.rectangle != nil)
+    }
+
+    func selectAnnotation(_ annotation: Annotation?) {
+        drawingRegion = false
+        copyStatus = nil
+        regionDraft = annotation.map { CatalogRegionDraft(annotation: $0) }
+    }
+
+    func newRegion() {
+        regionDraft = CatalogRegionDraft()
+        drawingRegion = true
+        copyStatus = nil
+    }
+
+    func cancelRegionDraft() {
+        regionDraft = nil
+        drawingRegion = false
+        copyStatus = nil
+    }
+
+    func finishDrawing(_ rectangle: CGRect) {
+        guard !busy, drawingRegion, regionDraft != nil else { return }
+        regionDraft?.rectangle = rectangle
+        regionDraft?.geometryChanged = true
+        drawingRegion = false
+        copyStatus = nil
+    }
+
+    func saveRegion() { changeAnnotation(deleting: false) }
+    func deleteRegion() { changeAnnotation(deleting: true) }
+
+    private func changeAnnotation(deleting: Bool) {
+        guard !busy, connected, canEditRegions, let client, let memory, let draft = regionDraft,
+              !showingCrop, !drawingRegion, (deleting ? draft.annotationID != nil && !hasRegionChanges : canSaveRegion) else { return }
+        let token = generation
+        let hitID = selected?.id
+        let assetID = memory.asset.id, revisionID = memory.revision.id
+        busy = true
+        error = nil
+        copyStatus = nil
+        Task {
+            do {
+                let change: AnnotationChange
+                if deleting, let id = draft.annotationID {
+                    change = try await client.deleteAnnotation(assetID: assetID, revisionID: revisionID, annotationID: id)
+                } else if let id = draft.annotationID {
+                    change = try await client.updateAnnotation(assetID: assetID, revisionID: revisionID, annotationID: id,
+                        note: draft.note, region: draft.geometryChanged ? draft.coordinates : nil)
+                } else {
+                    change = try await client.createAnnotation(assetID: assetID, revisionID: revisionID,
+                        note: draft.note, region: draft.coordinates ?? [])
+                }
+                guard generation == token else { return }
+                // A committed write must not leave a draft that could be saved twice,
+                // even when the following refresh fails.
+                if selected?.id == hitID { cancelRegionDraft() }
+                hits.removeAll { $0.annotationID == change.annotationID }
+                let refreshed = try await client.fetchMemory(assetID: assetID, revisionID: revisionID)
+                guard generation == token else { return }
+                if selected?.id == hitID, self.memory?.revision.id == revisionID {
+                    self.memory = refreshed
+                    selectAnnotation(refreshed.annotations.first { $0.id == change.annotationID })
+                }
+            } catch {
+                guard generation == token else { return }
+                report(error)
+            }
+            guard generation == token else { return }
+            finishRequest()
+        }
+    }
+
+    func copyForLLM(pasteboard: NSPasteboard = .general) {
+        guard !busy, connected, canCopyPayload, !hasRegionChanges, !drawingRegion, let client, let memory,
+              let annotation = selectedAnnotation else { return }
+        let token = generation
+        let hitID = selected?.id
+        let mode = payloadImageMode
+        busy = true
+        error = nil
+        copyStatus = nil
+        Task {
+            do {
+                let payload = try await client.buildPayload(assetID: memory.asset.id, revisionID: memory.revision.id,
+                    regionIDs: [annotation.regionID], imageMode: mode)
+                let text = try payload.clipboardJSON()
+                guard generation == token else { return }
+                if selected?.id == hitID, selectedAnnotation?.id == annotation.id {
+                    pasteboard.clearContents()
+                    if pasteboard.setString(text, forType: .string) { copyStatus = "Copied saved region (\(mode))" }
+                    else { self.error = "The clipboard could not be written. Try Copy for LLM again." }
                 }
             } catch {
                 guard generation == token else { return }
@@ -242,7 +382,7 @@ struct EngineLibraryView: View {
                         .textFieldStyle(.roundedBorder).onSubmit(model.search)
                     Button("Search", action: model.search)
                         .disabled(model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }.disabled(model.busy).padding(.horizontal).padding(.bottom, 12)
+                }.disabled(model.busy || model.hasRegionChanges).padding(.horizontal).padding(.bottom, 12)
             }
             if let error = model.error {
                 Text(error).foregroundStyle(.red).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading).padding()
@@ -267,7 +407,7 @@ struct EngineLibraryView: View {
                                 }.padding(10).frame(maxWidth: .infinity, alignment: .leading)
                                     .background(model.selected?.id == hit.id ? Color.accentColor.opacity(0.12) : .clear,
                                                 in: RoundedRectangle(cornerRadius: 8))
-                            }.buttonStyle(.plain).disabled(model.busy)
+                            }.buttonStyle(.plain).disabled(model.busy || model.hasRegionChanges)
                         }
                     }.padding(8)
                 }.frame(minWidth: 240, idealWidth: 320, maxWidth: 400)
@@ -275,7 +415,7 @@ struct EngineLibraryView: View {
                     .frame(minWidth: 360, maxWidth: .infinity, maxHeight: .infinity)
             }
             Divider()
-            Text("Read-only development connection · lexical search · no automatic capture import")
+            Text("Local catalog · saved region notes · lexical search · no automatic capture import")
                 .font(.caption).foregroundStyle(.secondary).padding(10)
         }
     }
@@ -295,25 +435,20 @@ struct EngineEvidenceDetail: View {
                 HStack {
                     Button("Full image") { model.open(selected) }
                     Button("Saved region") { model.open(selected, crop: true) }
-                        .disabled(selected.regionID == nil && selected.observationID == nil)
+                        .disabled(!model.hasSavedCrop)
                     if model.busy { ProgressView().controlSize(.small) }
-                }.disabled(model.busy || !model.connected)
+                }.disabled(model.busy || !model.connected || model.hasRegionChanges)
                 if let image = model.image {
-                    EngineEvidenceImage(image: image, target: model.showingCrop ? nil : selected.target)
+                    if !model.showingCrop, let memory = model.memory {
+                        CatalogRegionCanvas(model: model, image: image, annotations: memory.annotations)
+                    } else {
+                        EngineEvidenceImage(image: image, target: model.showingCrop ? nil : selected.target)
+                    }
                     Text(model.showingCrop ? "Saved-region crop" : "Exact saved revision · highlighted match")
                         .font(.caption).foregroundStyle(.secondary)
                 } else { Spacer() }
                 if let memory = model.memory {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 8) {
-                            ForEach(memory.annotations) { annotation in
-                                if !annotation.note.isEmpty { Text(annotation.note).textSelection(.enabled) }
-                                if !annotation.selectedText.isEmpty {
-                                    Text(annotation.selectedText).foregroundStyle(.secondary).textSelection(.enabled)
-                                }
-                            }
-                        }.frame(maxWidth: .infinity, alignment: .leading)
-                    }.frame(maxHeight: 120)
+                    CatalogRegionControls(model: model, annotations: memory.annotations)
                 }
             } else {
                 Text("Select a match to fetch its saved image and context.").foregroundStyle(.secondary)

@@ -1,6 +1,6 @@
 # One local interface for search and evidence fetch
 
-We now have a versioned read-only interface over the Python catalog. A local client can launch `seenx-engine`, send JSON requests on stdin, and read JSON responses on stdout. The process keeps one catalog connection open and handles requests sequentially until stdin closes.
+We now have a versioned interface over the Python catalog, read-only by default with opt-in local annotation writes. A local client can launch `seenx-engine`, send JSON requests on stdin, and read JSON responses on stdout. The process keeps one catalog connection open and handles requests sequentially until stdin closes.
 
 This is the first internal app integration boundary. The native app's optional **Open Python Library…** browser now uses it through [SeenXEngineClient](../../packages/SeenXEngineClient); see [the native integration lesson](../../docs/native-engine.md). Its main capture launcher/library remain separate. `seenx-engine` uses its own JSON-line protocol; the optional `seenx-mcp` adapter below supplies MCP JSON-RPC over stdio using the same version-1 search/fetch contract. Neither opens a network listener or downloads models.
 
@@ -54,7 +54,7 @@ The version-1 engine applies the same grant predicate to search candidates **bef
 
 Identity and trusted mode are host configuration, not authentication. The MCP adapter binds its local client to the owner-configured startup principal; tool arguments cannot choose a principal, trusted mode, grant writes, or the catalog path. External authentication isn't implemented. Local processes with direct filesystem/catalog access remain trusted OS-account owners.
 
-Requests are read-only. Startup can initialize or migrate the catalog and its derived index, just like the existing CLI. Use `seenx-memory` for deliberate import, annotation, editing, removal, OCR, or reindexing. No write methods are exposed through this protocol yet.
+Requests are read-only unless the host supplies both `--trusted-local --allow-writes`. This opt-in advertises `annotation.create`, `annotation.update`, and `annotation.delete` and sets `read_only_requests` to false. Principal/grant-scoped sessions cannot enable writes. Startup can initialize or migrate the catalog and its derived index, just like the existing CLI. Import, asset removal, OCR, and reindexing remain owner CLI operations.
 
 ## Read-only MCP over stdio
 
@@ -129,6 +129,12 @@ Results include the saved target, its annotation or OCR context, and `reference_
 
 With `include_image: true`, the attachment contains that crop. Its dimensions are `right - left` and `bottom - top`. Normalized targets still refer to the parent image, not the crop. A client overlaying more context on a crop needs to account for the crop's left/top offset.
 
+### Local annotation methods and H3 payload
+
+All annotation methods require `asset_id` and `revision_id`; the revision must belong to the asset. `annotation.create` additionally requires a string `note` and `region: [x, y, width, height]`, a positive rectangle inside normalized top-left bounds. `annotation.update` requires `annotation_id` and at least one of `note` or `region`. `annotation.delete` requires `annotation_id`. Updates/deletions resolve the annotation inside the exact revision before writing; unknown/foreign IDs return `not_found`. Unknown fields and invalid drafts are rejected. The existing catalog methods transactionally maintain annotations, regions, and the search index; geometry/note edits preserve selected text and OCR quote provenance. Success returns `annotation_id`, `region_id`, and `revision_id`. Refresh with `memory.fetch` after a successful write. A transport failure during a mutation has an uncertain outcome; reconnect and inspect saved evidence before retrying.
+
+Read-only `payload.build` requires `asset_id`, `revision_id`, and 1–16 distinct saved `region_ids`; optional `image_mode` is `crop` (default) or `full`. The H3 builder returns `schema_version: 1` and `content`: JSON metadata text followed by base64 PNG parts. Metadata includes IDs, saved note/selection and provenance, normalized targets, full-image pixel bounds, reference dimensions/hash, and image indices. Crop mode attaches one crop per region; full mode attaches one shared full image. Retrieved evidence is marked untrusted. The native **Copy for LLM** action requests one selected saved region and copies this JSON without calling a model. All existing image and aggregate response limits apply.
+
 ## Image attachment shape
 
 ```json
@@ -178,7 +184,7 @@ An invalid request doesn't terminate the session. An overlong input line is drai
 5. Decode an optional PNG and display it with its explicit dimensions/coordinate context.
 6. On shutdown, close stdin and wait for exit. Handle transport failure without discarding an unsaved native draft.
 
-Requests are processed sequentially in this slice. There is no request cancellation message, background indexing queue, or automatic native-library import. The native development library is still separate; migrating its captures and adding deliberate write operations need an explicit next integration step. Assistant integration uses the grant-scoped MCP adapter above.
+Requests are processed sequentially in this slice. There is no request cancellation message, background indexing queue, or automatic native-library import. The native development library is still separate; migrating its captures needs an explicit next integration step. Assistant integration uses the grant-scoped read-only MCP adapter above.
 
 ## Verification and learning concepts
 

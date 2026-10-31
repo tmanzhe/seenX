@@ -192,4 +192,61 @@ final class EngineClientTests: XCTestCase {
             await client.close()
         }
     }
+
+    func testAnnotationWriteHandshakeAndTypedRequests() async throws {
+        let record = URL(fileURLWithPath: "/tmp").appendingPathComponent("seenx-requests-\(UUID().uuidString).jsonl")
+        defer { try? FileManager.default.removeItem(at: record) }
+        let writable = info.replacingOccurrences(of: "\"read_only_requests\":true", with: "\"read_only_requests\":false")
+            .replacingOccurrences(of: "\"region.fetch\"", with: "\"region.fetch\",\"annotation.create\",\"annotation.update\",\"annotation.delete\"")
+        let receipt = #"{"annotation_id":"note","region_id":"region","revision_id":"revision"}"#
+        await assertError(.invalidResponse) {
+            try await EngineClient.launch(configuration: configuration(action: response(receipt), infoOverride: writable))
+        }
+        var config = configuration(action: "printf '%s\\n' \"$line\" >> '\(record.path)'; \(response(receipt))", infoOverride: writable)
+        config.allowsWrites = true
+        let client = try await EngineClient.launch(configuration: config)
+        XCTAssertTrue(client.canWriteAnnotations)
+        let created = try await client.createAnnotation(assetID: "asset", revisionID: "revision", note: "Café", region: [0, 0, 1, 1])
+        XCTAssertEqual(created.annotationID, "note")
+        let edited = try await client.updateAnnotation(assetID: "asset", revisionID: "revision", annotationID: created.annotationID,
+                                                       note: "Edited", region: [0.1, 0.2, 0.3, 0.4])
+        XCTAssertEqual(edited.regionID, created.regionID)
+        let removed = try await client.deleteAnnotation(assetID: "asset", revisionID: "revision", annotationID: created.annotationID)
+        XCTAssertEqual(removed.revisionID, "revision")
+        await client.close()
+        let frames = try String(contentsOf: record, encoding: .utf8).split(separator: "\n").map {
+            try XCTUnwrap(JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Any])
+        }
+        XCTAssertEqual(frames.compactMap { $0["method"] as? String }, ["annotation.create", "annotation.update", "annotation.delete"])
+        let createParams = try XCTUnwrap(frames[0]["params"] as? [String: Any])
+        XCTAssertEqual(createParams["region"] as? [Double], [0, 0, 1, 1])
+        XCTAssertEqual(createParams["note"] as? String, "Café")
+        XCTAssertEqual(createParams["asset_id"] as? String, "asset")
+        let editParams = try XCTUnwrap(frames[1]["params"] as? [String: Any])
+        XCTAssertEqual(editParams["annotation_id"] as? String, "note")
+        XCTAssertEqual(editParams["region"] as? [Double], [0.1, 0.2, 0.3, 0.4])
+        XCTAssertNil(editParams["selected_text"])
+        let deleteParams = try XCTUnwrap(frames[2]["params"] as? [String: Any])
+        XCTAssertEqual(Set(deleteParams.keys), Set(["asset_id", "revision_id", "annotation_id"]))
+        let reader = try await EngineClient.launch(configuration: configuration(action: response(receipt)))
+        XCTAssertFalse(reader.canWriteAnnotations)
+        await assertError(.unsupportedMethod) {
+            try await reader.createAnnotation(assetID: "asset", revisionID: "revision", note: "Blocked", region: [0, 0, 1, 1])
+        }
+        await reader.close()
+    }
+
+    func testPayloadClipboardJSONPreservesH3KeysAndOpaqueMetadata() async throws {
+        let payload = #"{"schema_version":1,"content":[{"type":"text","text":"{\"region_id\":\"region\",\"note\":\"Café\\nline two\",\"evidence_trust\":\"untrusted\"}"},{"type":"image","mimeType":"image/png","data":"cG5n"}]}"#
+        let capabilities = info.replacingOccurrences(of: "\"region.fetch\"", with: "\"region.fetch\",\"payload.build\"")
+        let client = try await EngineClient.launch(configuration: configuration(action: response(payload), infoOverride: capabilities))
+        let result = try await client.buildPayload(assetID: "asset", revisionID: "revision", regionIDs: ["region"], imageMode: "full")
+        let encoded = try result.clipboardJSON()
+        let copied = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(encoded.utf8)) as? NSDictionary)
+        let original = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(payload.utf8)) as? NSDictionary)
+        XCTAssertEqual(copied, original)
+        XCTAssertFalse(encoded.contains("schemaVersion"))
+        XCTAssertFalse(encoded.contains("mime_type"))
+        await client.close()
+    }
 }

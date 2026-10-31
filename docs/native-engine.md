@@ -48,7 +48,7 @@ The operating system supplies two pipes: one carries requests into the helper's 
 
 No HTTP server is needed for this local development connection. The client code lives in its own [Swift package](../packages/SeenXEngineClient); its contract can be tested independently of windows, permission dialogs, and capture shortcuts. Python remains our behavior reference while we decide which pieces belong in the eventual native engine.
 
-The helper is launched from the repository you deliberately select. The library directory is a launch argument, not something a search request can change. The first-party app explicitly launches with `--trusted-local` for whole-catalog access. Grant-scoped callers use persisted Python engine grants and default deny; an MCP adapter hasn't been added. See [grant semantics](../python/docs/engine-contract.md#owner-managed-source-and-collection-grants).
+The helper is launched from the repository you deliberately select. The library directory is a launch argument, not something a search request can change. The first-party app explicitly launches with `--trusted-local --allow-writes` for whole-catalog access and annotation editing. Grant-scoped callers and the MCP adapter retain read-only access. See [grant semantics](../python/docs/engine-contract.md#owner-managed-source-and-collection-grants).
 
 ## Images and coordinates
 
@@ -66,7 +66,7 @@ The browser model tracks a connection generation. Disconnecting or replacing the
 
 Python's normal local JSONL diagnostics remain enabled for this browser. They record engine method names, correlation IDs, timings, and outcome/error codes. Query text, note bodies, paths, and image bytes aren't logged by the client. Helper stderr is discarded rather than copied into a UI error or another log. See [the engine contract](../python/docs/engine-contract.md) for exact limits and error codes.
 
-Fetch/search requests are read-only. Starting the helper can initialize/migrate an existing catalog and its derived index under the same rules as the CLI. Selecting a missing catalog is rejected before launch. This development browser doesn't expose annotation writes, deletion, export, or migration from the native manifest.
+Fetch/search requests are read-only. Starting the helper can initialize/migrate an existing catalog and its derived index under the same rules as the CLI. Selecting a missing catalog is rejected before launch. Full-image catalog details now expose **New region**, note editing, rectangle redrawing, **Save**, **Cancel**, and **Delete** through opt-in local annotation methods. **Copy for LLM** copies the Python H3 payload for one selected saved region, with a crop or shared full-image attachment. It does not call a model. Both the launcher and separate browser share these controls; native captures still require an explicit future import design. See [the app workflow](../apps/macos/README.md#storage-and-boundaries).
 
 ## Run the checks
 
@@ -88,4 +88,4 @@ The check imports into a temporary library, creates test notes/OCR observations 
 
 Concepts to learn next: **Swift packages**, **Codable/Decodable**, **async/await**, **the main actor**, **process pipes**, **timeouts**, **request IDs**, and **stale asynchronous results**. On the Python side, follow **JSON serialization**, **context managers**, **exceptions**, and **database transactions** through the [engine lesson](../python/docs/engine-contract.md).
 
-Next comes an explicit import/write design for native captures. Launcher catalog retrieval is read-only; the two libraries still need a deliberate mapping for image revisions, OCR boxes, notes, and highlights. Portable export and assistant access remain separate roadmap steps.
+Next comes an explicit import/write design for native captures. The two libraries still need a deliberate mapping for image revisions, OCR boxes, notes, and highlights. Portable library export remains separate from copying an H3 model-input payload.

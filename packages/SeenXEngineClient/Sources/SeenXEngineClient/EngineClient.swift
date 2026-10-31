@@ -1,7 +1,7 @@
 import Foundation
 import Darwin
 
-/// One trusted local library per process. No network or write methods are exposed.
+/// One local library per process. Annotation writes require explicit configuration.
 public final class EngineClient: @unchecked Sendable {
     public struct Configuration: Sendable {
         public var executableURL: URL
@@ -9,14 +9,16 @@ public final class EngineClient: @unchecked Sendable {
         public var currentDirectoryURL: URL?
         public var environment: [String: String]?
         public var requestTimeout: TimeInterval
+        public var allowsWrites: Bool
 
         public init(executableURL: URL, arguments: [String] = [], currentDirectoryURL: URL? = nil,
-                    environment: [String: String]? = nil, requestTimeout: TimeInterval = 15) {
+                    environment: [String: String]? = nil, requestTimeout: TimeInterval = 15, allowsWrites: Bool = false) {
             self.executableURL = executableURL
             self.arguments = arguments
             self.currentDirectoryURL = currentDirectoryURL
             self.environment = environment
             self.requestTimeout = requestTimeout
+            self.allowsWrites = allowsWrites
         }
     }
 
@@ -34,7 +36,7 @@ public final class EngineClient: @unchecked Sendable {
         do {
             let info: EngineInfo = try await transport.request(method: "engine.info", params: [:])
             guard info.protocolVersion == 1 else { throw EngineClientError.unsupportedVersion(info.protocolVersion) }
-            guard info.readOnlyRequests,
+            guard (info.readOnlyRequests || configuration.allowsWrites),
                   Set(["engine.info", "memory.search", "memory.fetch", "region.fetch"]).isSubset(of: Set(info.methods))
             else { throw EngineClientError.invalidResponse }
             return EngineClient(transport: transport, info: info)
@@ -66,6 +68,37 @@ public final class EngineClient: @unchecked Sendable {
         case .observation(let id): params["observation_id"] = id
         }
         return try await transport.request(method: "region.fetch", params: params)
+    }
+
+    public var canWriteAnnotations: Bool {
+        !info.readOnlyRequests && Set(["annotation.create", "annotation.update", "annotation.delete"]).isSubset(of: Set(info.methods))
+    }
+
+    public func createAnnotation(assetID: String, revisionID: String, note: String, region: [Double]) async throws -> AnnotationChange {
+        guard canWriteAnnotations else { throw EngineClientError.unsupportedMethod }
+        return try await transport.request(method: "annotation.create", params: [
+            "asset_id": assetID, "revision_id": revisionID, "note": note, "region": region])
+    }
+
+    public func updateAnnotation(assetID: String, revisionID: String, annotationID: String,
+                                 note: String, region: [Double]? = nil) async throws -> AnnotationChange {
+        guard canWriteAnnotations else { throw EngineClientError.unsupportedMethod }
+        var params: [String: Any] = ["asset_id": assetID, "revision_id": revisionID, "annotation_id": annotationID, "note": note]
+        params["region"] = region
+        return try await transport.request(method: "annotation.update", params: params)
+    }
+
+    public func deleteAnnotation(assetID: String, revisionID: String, annotationID: String) async throws -> AnnotationChange {
+        guard canWriteAnnotations else { throw EngineClientError.unsupportedMethod }
+        return try await transport.request(method: "annotation.delete", params: [
+            "asset_id": assetID, "revision_id": revisionID, "annotation_id": annotationID])
+    }
+
+    public func buildPayload(assetID: String, revisionID: String, regionIDs: [String],
+                             imageMode: String = "crop") async throws -> LLMPayload {
+        guard info.methods.contains("payload.build") else { throw EngineClientError.unsupportedMethod }
+        return try await transport.request(method: "payload.build", params: [
+            "asset_id": assetID, "revision_id": revisionID, "region_ids": regionIDs, "image_mode": imageMode])
     }
 
     /// Finishes any active bounded request, closes stdin, then reaps the helper.

@@ -3,6 +3,38 @@ import Foundation
 public enum SearchMatch: String, Sendable { case phrase, all }
 public enum RegionReference: Sendable { case region(String), observation(String) }
 
+public struct AnnotationChange: Decodable, Sendable {
+    public let annotationID: String
+    public let regionID: String
+    public let revisionID: String
+}
+
+/// Keep the Python builder's text metadata opaque, including exact coordinate/provenance keys.
+public struct LLMPayload: Decodable, Sendable {
+    public struct Part: Decodable, Sendable {
+        public let type: String
+        public let text: String?
+        public let mimeType: String?
+        public let data: String?
+    }
+    public let schemaVersion: Int
+    public let content: [Part]
+
+    public func clipboardJSON() throws -> String {
+        guard schemaVersion == 1, content.first?.type == "text", content.first?.text != nil,
+              (2...17).contains(content.count) else { throw EngineClientError.invalidResponse }
+        let parts: [[String: String]] = try content.enumerated().map { index, part in
+            if index == 0, let text = part.text { return ["type": "text", "text": text] }
+            guard part.type == "image", part.mimeType == "image/png", let data = part.data,
+                  Data(base64Encoded: data) != nil else { throw EngineClientError.invalidResponse }
+            return ["type": "image", "mimeType": "image/png", "data": data]
+        }
+        let data = try JSONSerialization.data(withJSONObject: ["schema_version": schemaVersion, "content": parts], options: [.sortedKeys])
+        guard let text = String(data: data, encoding: .utf8) else { throw EngineClientError.invalidResponse }
+        return text
+    }
+}
+
 public struct EngineInfo: Decodable, Sendable {
     public let protocolVersion: Int
     public let catalogSchemaVersion: Int
@@ -208,6 +240,7 @@ public enum JSONValue: Decodable, Sendable {
 }
 
 public enum EngineClientError: Error, Equatable, Sendable {
+    case unsupportedMethod
     case launchFailed
     case closed
     case timeout
@@ -223,6 +256,7 @@ public enum EngineClientError: Error, Equatable, Sendable {
 extension EngineClientError: LocalizedError {
     public var errorDescription: String? {
         switch self {
+        case .unsupportedMethod: return "The local engine does not support this action. Reconnect with the updated engine."
         case .launchFailed: return "The local engine could not start. Check the selected Python environment."
         case .closed: return "The local engine session is closed."
         case .timeout: return "The local engine request timed out. Reconnect to retry."

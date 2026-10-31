@@ -1,4 +1,4 @@
-"""Version-1 read-only contract with owner-bound caller access."""
+"""Version-1 contract with owner-bound reads and opt-in local annotation writes."""
 
 import base64
 import hashlib
@@ -10,7 +10,7 @@ import sqlite3
 
 from PIL import Image, ImageOps
 
-from seenx.catalog import SCHEMA_VERSION, pixel_edge
+from seenx.catalog import SCHEMA_VERSION, pixel_edge, target_geometry
 from seenx.catalog_access import AccessDeniedError, identifier
 from seenx.observability import count, event, run_context
 
@@ -22,6 +22,7 @@ MAX_SOURCE_BYTES = 32 * 1024 * 1024
 MAX_IMAGE_BYTES = 4 * 1024 * 1024
 MAX_IMAGE_PIXELS = 20_000_000
 METHODS = {"engine.info", "memory.search", "memory.fetch", "region.fetch", "payload.build"}
+WRITE_METHODS = {"annotation.create", "annotation.update", "annotation.delete"}
 
 
 class EngineError(Exception):
@@ -73,13 +74,54 @@ class LimitedImageBuffer(BytesIO):
 
 
 class Engine:
-    def __init__(self, catalog, *, principal_id: str | None = None, trusted_local: bool = False):
+    def __init__(self, catalog, *, principal_id: str | None = None, trusted_local: bool = False,
+                 allow_writes: bool = False):
         # Caller identity/trust comes from the host, never request JSON.
         if type(trusted_local) is not bool or (trusted_local and principal_id is not None):
             raise ValueError("Choose either a grant-scoped principal or trusted local access")
         self.catalog = catalog
         self.principal_id = identifier(principal_id) if principal_id is not None else None
         self.trusted_local = trusted_local
+        if type(allow_writes) is not bool or (allow_writes and not trusted_local):
+            raise ValueError("Annotation writes require explicit trusted local access")
+        self.allow_writes = allow_writes
+        self.methods = METHODS | WRITE_METHODS if allow_writes else METHODS
+
+    def _annotate(self, method: str, params: dict) -> dict:
+        if not self.allow_writes:
+            raise EngineError("unknown_method", "Unsupported engine method")
+        required = {"asset_id", "revision_id"}
+        if method == "annotation.create":
+            required |= {"note", "region"}
+            allowed = required
+        else:
+            required |= {"annotation_id"}
+            allowed = required | ({"note", "region"} if method == "annotation.update" else set())
+        _fields(params, allowed, required)
+        if "note" in params and not isinstance(params["note"], str):
+            raise EngineError("invalid_parameters", "note must be a string")
+        if "region" in params:
+            if not isinstance(params["region"], list) or any(type(value) not in (int, float) for value in params["region"]):
+                raise EngineError("invalid_parameters", "region must be [x, y, width, height]")
+            target_geometry(region=params["region"])
+        if method == "annotation.update" and not {"note", "region"} & params.keys():
+            raise EngineError("invalid_parameters", "Supply a note or region to update")
+        # Validate asset/revision ownership before any mutation. Updates never accept
+        # free-standing annotation IDs belonging to a different image or revision.
+        memory = self._memory(params)
+        if method == "annotation.create":
+            return self.catalog.add_note(memory["revision"]["id"], params["note"], region=params["region"])
+        annotation_id = _identifier(params["annotation_id"], "annotation_id")
+        annotation = next((item for item in memory["annotations"] if item["id"] == annotation_id), None)
+        if annotation is None:
+            raise LookupError("Annotation not found for this revision")
+        if method == "annotation.update":
+            # Omit selected_text so OCR quote provenance survives geometry/note edits.
+            self.catalog.edit_note(annotation_id, note=params.get("note"), region=params.get("region"))
+        else:
+            self.catalog.delete_note(annotation_id)
+        return {"annotation_id": annotation_id, "region_id": annotation["region_id"],
+                "revision_id": memory["revision"]["id"]}
 
     def _memory(self, params: dict) -> dict:
         asset_id = _identifier(params.get("asset_id"), "asset_id")
@@ -129,6 +171,8 @@ class Engine:
                     "data": base64.b64encode(encoded).decode("ascii")}
 
     def dispatch(self, method: str, params: dict):
+        if method in WRITE_METHODS:
+            return self._annotate(method, params)
         if method == "payload.build":
             from seenx.llm_payload import build_payload
             _fields(params, {"asset_id", "revision_id", "region_ids", "image_mode"},
@@ -138,7 +182,7 @@ class Engine:
         if method == "engine.info":
             _fields(params, set())
             return {"protocol_version": PROTOCOL_VERSION, "catalog_schema_version": SCHEMA_VERSION,
-                    "methods": sorted(METHODS), "read_only_requests": True,
+                    "methods": sorted(self.methods), "read_only_requests": not self.allow_writes,
                     "limits": {"request_bytes": MAX_REQUEST_BYTES, "response_bytes": MAX_RESPONSE_BYTES,
                                "source_bytes": MAX_SOURCE_BYTES, "image_bytes": MAX_IMAGE_BYTES,
                                "image_pixels": MAX_IMAGE_PIXELS, "search_results": 100}}
@@ -227,7 +271,7 @@ class Engine:
                 if isinstance(request["version"], bool) or not isinstance(request["version"], int) or request["version"] != PROTOCOL_VERSION:
                     raise EngineError("unsupported_version", "Supported protocol version is 1")
                 method, params = request["method"], request["params"]
-                if not isinstance(method, str) or method not in METHODS:
+                if not isinstance(method, str) or method not in self.methods:
                     raise EngineError("unknown_method", "Unsupported engine method")
                 if not isinstance(params, dict):
                     raise EngineError("invalid_parameters", "params must be an object")
