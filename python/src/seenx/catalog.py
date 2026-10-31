@@ -109,15 +109,22 @@ def target_geometry(region: list | None = None, point: list | None = None) -> tu
 
 
 class Catalog:
-    def __init__(self, root: Path = LIBRARY_ROOT):
+    def __init__(self, root: Path = LIBRARY_ROOT, *, read_only: bool = False):
         self.root = root.expanduser().resolve()
-        self.root.mkdir(parents=True, exist_ok=True)
-        self.connection = sqlite3.connect(self.root / "catalog.sqlite3")
+        if read_only:
+            self.connection = sqlite3.connect((self.root / "catalog.sqlite3").as_uri() + "?mode=ro", uri=True)
+        else:
+            self.root.mkdir(parents=True, exist_ok=True)
+            self.connection = sqlite3.connect(self.root / "catalog.sqlite3")
         self.connection.row_factory = sqlite3.Row
         try:
             self.connection.execute("PRAGMA foreign_keys = ON")
+            if read_only:
+                self.connection.execute("PRAGMA query_only = ON")
             version = self.connection.execute("PRAGMA user_version").fetchone()[0]
             identity = self.connection.execute("PRAGMA application_id").fetchone()[0]
+            if read_only and (identity != APPLICATION_ID or version != SCHEMA_VERSION):
+                raise ValueError("Read-only access requires a current seenX catalog; open it with the owner CLI first")
             initialized = False
             if version == 0 and identity == 0:
                 tables = self.connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()

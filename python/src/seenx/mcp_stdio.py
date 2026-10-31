@@ -39,6 +39,16 @@ TOOL_SCHEMAS = {
             {"required": ["revision_id", "observation_id"], "not": {"required": ["region_id"]}},
         ],
     },
+    "build_payload": {
+        "type": "object", "additionalProperties": False,
+        "required": ["asset_id", "revision_id", "region_ids"],
+        "properties": {
+            "asset_id": IDENTIFIER, "revision_id": IDENTIFIER,
+            "region_ids": {"type": "array", "items": IDENTIFIER, "minItems": 1,
+                           "maxItems": 16, "uniqueItems": True},
+            "image_mode": {"type": "string", "enum": ["crop", "full"], "default": "crop"},
+        },
+    },
 }
 
 
@@ -50,8 +60,8 @@ class MCPAdapter:
 
     def call(self, name: str, arguments: dict) -> dict:
         if name not in TOOL_SCHEMAS:
-            return {"error": {"code": "unknown_tool", "message": "Supported tools are search and fetch"}}
-        method = "memory.search" if name == "search" else "memory.fetch"
+            return {"error": {"code": "unknown_tool", "message": "Supported tools are search, fetch and build_payload"}}
+        method = {"search": "memory.search", "fetch": "memory.fetch", "build_payload": "payload.build"}[name]
         if name == "fetch" and isinstance(arguments, dict) and {"region_id", "observation_id"} & arguments.keys():
             method = "region.fetch"
         # Use handle rather than dispatch to retain contract limits, sanitized errors,
@@ -77,6 +87,9 @@ def create_server(adapter: MCPAdapter):
             "search": "Search granted notes, selected text and OCR; return compact evidence references.",
             "fetch": "Fetch a granted memory, or a saved region/OCR target using its revision_id and "
                      "exactly one region_id or observation_id. Set include_image for a PNG image/crop.",
+            "build_payload": "Package saved regions and notes as version-1 model input: JSON text metadata "
+                             "and base64 PNG parts. image_mode crop returns one crop per region; full returns "
+                             "one full image. Coordinates refer to the full oriented image. No model is called.",
         }
         return [types.Tool(name=name, description=descriptions[name], inputSchema=schema,
                            annotations=types.ToolAnnotations(readOnlyHint=True, destructiveHint=False,
@@ -93,6 +106,9 @@ def create_server(adapter: MCPAdapter):
         if attachment is not None:
             data = attachment.pop("data")
             content.append(types.ImageContent(type="image", data=data, mimeType=attachment["media_type"]))
+        if name == "build_payload" and "result" in response:
+            # Return the documented payload parts directly, preserving image_index.
+            return types.CallToolResult(content=response["result"]["content"], isError=False)
         content.insert(0, types.TextContent(type="text", text=json.dumps(response, ensure_ascii=False,
                                                                        separators=(",", ":"))))
         return types.CallToolResult(content=content, isError="error" in response)
@@ -103,7 +119,7 @@ def create_server(adapter: MCPAdapter):
 async def serve(library: Path, principal_id: str) -> None:
     from mcp.server.stdio import stdio_server
 
-    with Catalog(library) as catalog:
+    with Catalog(library, read_only=True) as catalog:
         server = create_server(MCPAdapter(catalog, principal_id=principal_id))
         async with stdio_server() as (incoming, outgoing):
             await server.run(incoming, outgoing, server.create_initialization_options())

@@ -142,7 +142,7 @@ class MCPProtocolTests(MCPFixture, unittest.IsolatedAsyncioTestCase):
                     self.assertIsNone(initialized.capabilities.resources)
                     self.assertIsNone(initialized.capabilities.prompts)
                     tools = (await session.list_tools()).tools
-                    self.assertEqual(sorted(tool.name for tool in tools), ["fetch", "search"])
+                    self.assertEqual(sorted(tool.name for tool in tools), ["build_payload", "fetch", "search"])
                     self.assertTrue(all(tool.annotations.readOnlyHint for tool in tools))
                     empty = await session.call_tool("search", {"query": "spacing"})
                     self.assertEqual(json.loads(empty.content[0].text)["result"], [])

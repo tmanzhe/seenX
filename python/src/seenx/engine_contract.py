@@ -21,7 +21,7 @@ MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 MAX_SOURCE_BYTES = 32 * 1024 * 1024
 MAX_IMAGE_BYTES = 4 * 1024 * 1024
 MAX_IMAGE_PIXELS = 20_000_000
-METHODS = {"engine.info", "memory.search", "memory.fetch", "region.fetch"}
+METHODS = {"engine.info", "memory.search", "memory.fetch", "region.fetch", "payload.build"}
 
 
 class EngineError(Exception):
@@ -129,6 +129,12 @@ class Engine:
                     "data": base64.b64encode(encoded).decode("ascii")}
 
     def dispatch(self, method: str, params: dict):
+        if method == "payload.build":
+            from seenx.llm_payload import build_payload
+            _fields(params, {"asset_id", "revision_id", "region_ids", "image_mode"},
+                    {"asset_id", "revision_id", "region_ids"})
+            return build_payload(self.catalog, **params, principal_id=self.principal_id,
+                                 trusted_local=self.trusted_local)
         if method == "engine.info":
             _fields(params, set())
             return {"protocol_version": PROTOCOL_VERSION, "catalog_schema_version": SCHEMA_VERSION,
