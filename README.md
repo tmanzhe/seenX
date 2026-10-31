@@ -12,9 +12,9 @@ The first-release loop is **capture → highlight or pin → add an optional not
 | --- | --- |
 | [Website and docs](apps/web/README.md) | Working sample capture, image search, text highlights, point/region notes, browser persistence, and JSON context export. [Live website](https://seenx-lovat.vercel.app). |
 | [Python engine](python/README.md) | Image/PDF reading, optional macOS OCR, text/visual/hybrid search, caching, diagnostics, and an initial durable image/revision/region-note catalog with CLI import, edit, fetch, and removal. |
-| [Mac application](apps/macos/README.md) | Documentation only. Native capture, global search, and the MCP bridge are not implemented. |
+| [Mac application](apps/macos/README.md) | Native capture, highlights, notes, local search, and an optional Python catalog connection. Requires macOS 14+ and signing setup. |
 
-The website uses authored samples and keyword matching. It does not read personal files, run semantic models, perform real OCR, or connect an assistant. Python now has a separate versioned memory catalog alongside the disposable extraction cache; its notes aren't connected to retrieval yet. Existing OCR returns text strings; preserving text boxes is the next step. Follow [the catalog lesson](python/docs/catalog.md) to import an image and save a region note that survives restart.
+The website uses authored samples and keyword matching. It does not read personal files, run semantic models, perform real OCR, or connect an assistant. Python has a separate versioned memory catalog with FTS5 search over notes, selections, and saved OCR boxes. Its read-only MCP server offers search, fetch, and image/region payload creation without calling a model. Follow [the catalog lesson](python/docs/catalog.md) to import an image and save a region note that survives restart.
 
 ## V1 direction
 
@@ -39,7 +39,7 @@ Local storage and search are separate from sharing results: content returned to 
 6. **Portable library and restore:** versioned complete/context-only archives, relinking, optional encryption, and new-laptop restore checks; reconnect access deliberately.
 7. **Production handoff and beta:** verify model/runtime packaging, offline behavior, permissions, and distribution. Use the working Swift app and Python reference to guide engine integration.
 
-Portable library transfer remains planned; the website currently exports single-memory JSON, not a backup of your real images or laptop.
+Python supports [complete and context-only library archives](python/docs/library-archive.md). The website exports single-memory JSON, not a backup of your real images or laptop.
 
 The complete milestones and completion criteria are in [the implementation plan](plan.md). [Architecture](docs/architecture.md) explains SQLite, vectors, the ontology, and component boundaries. PDFs/bookmarks as complete memory sources, automatic entity inference, team deployment, and a large organizing dashboard are later scope; existing PDF-reading experiments remain available.
 
@@ -53,14 +53,20 @@ The complete milestones and completion criteria are in [the implementation plan]
 | [docs/architecture.md](docs/architecture.md) | Stack decisions and implementation boundaries |
 | [plan.md](plan.md) | Ordered milestones, acceptance criteria, and immediate next step |
 
-## Development
+## Quickstart
 
-For Python, follow the [walkthrough](python/README.md). From the repository root:
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then run from the repository root on Linux or macOS:
 
 ```sh
-uv sync --project python --all-extras
-uv run --project python seenx-search practice-images --mode hybrid --ocr --cache --query "basketball"
+uv sync --project python --locked --extra mcp
+uv run --project python --extra mcp python -m seenx.demo
 ```
+
+The demo makes a synthetic image in a temporary library, saves a region note, then searches and fetches it through a local MCP subprocess. It checks crop/full-image payload pixels and revoked access, then removes the library. No API keys, paid APIs, OCR, model downloads, or database server are needed. Expect `PASS: offline demo; no model calls; temporary library removed.`
+
+For your own files and optional visual search, follow the [Python walkthrough](python/README.md).
+
+## Development
 
 For the website, use Node.js 24 (also recorded in `.node-version`):
 

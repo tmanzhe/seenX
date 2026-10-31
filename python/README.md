@@ -16,7 +16,7 @@ The optional read-only MCP server uses the same contract and requires an owner-c
 uv run --project python --extra mcp seenx-mcp --library /path/to/library --principal assistant-a
 ```
 
-It exposes exactly `search` and `fetch` over stdio. See the [MCP client config and grants](docs/engine-contract.md#read-only-mcp-over-stdio). In-process catalog evidence reads also require `principal_id` or explicit `trusted_local=True`.
+It exposes `search`, `fetch`, and `build_payload` over stdio. Payloads contain saved notes, region coordinates, and PNG crops or a full image. No model is called. See the [MCP client config and grants](docs/engine-contract.md#read-only-mcp-over-stdio). In-process catalog evidence reads also require `principal_id` or explicit `trusted_local=True`.
 
 ## Start here: uv manages the environment
 
@@ -25,15 +25,17 @@ See [library archive commands](docs/library-archive.md) for export, restore, and
 From the repository root:
 
 ```sh
-uv sync --project python --all-extras
-uv run --project python seenx-search practice-images --mode hybrid --ocr --cache --query "basketball"
+uv sync --project python --locked --extra mcp
+uv run --project python --extra mcp python -m seenx.demo
 ```
+
+This offline demo uses a synthetic image and a temporary library. It saves a region note, searches and fetches it over MCP, checks PNG payload pixels, and confirms that revoking a grant denies access. It needs no private files, API keys, models, or database server. The last line is `PASS: offline demo; no model calls; temporary library removed.`
 
 `uv` is already installed on the development Mac. On a new Mac, install it with `brew install uv`, or follow the [official installation instructions](https://docs.astral.sh/uv/getting-started/installation/).
 
 You don't need to create or activate an environment manually. `uv sync` reads `pyproject.toml` and `uv.lock`, creates `python/.venv`, and installs the selected dependencies. `.python-version` pins our development interpreter to Python 3.13.7. `uv run` executes a command in that environment. Keep this as the project's only Python environment; use `--project python` from the repository root instead of creating a second root `.venv`.
 
-The first sync downloads Python packages. Visual search also needs the pinned model, a separate download of roughly 600 MB. If it isn't already present, allow the first model download explicitly:
+The first sync downloads Python packages. For folder search, first put your own images in `practice-images/`; that folder isn't in Git. Install optional visual/OCR dependencies with `uv sync --project python --locked --all-extras`. Visual search also needs the pinned model, a separate download of roughly 600 MB. If it isn't already present, allow the first model download explicitly:
 
 ```sh
 uv run --project python seenx-visual practice-images --query "a photo of a laptop" --cache --download-model
@@ -45,7 +47,7 @@ Later model loads use local files unless downloads are requested. Your photos an
 
 The committed lockfile records exact dependency versions. Use `uv sync --project python --all-extras --locked` to require it to stay unchanged. We commit that file, not the generated virtual environment.
 
-The new MCP extra has not been resolved into the lockfile in this code-only change. An unlocked `uv sync` or the MCP command above must refresh it before `--locked` can be used with the updated project.
+The MCP extra is included in the lockfile.
 
 ## Commands you'll use
 
@@ -194,4 +196,4 @@ python/
 
 Start with variables, functions and return values, lists, dictionaries, conditions, and loops. Then learn exceptions and `with` statements. For recent work, look up `Python logging handlers formatters`, `Python contextvars`, `Python decorators`, `JSON Lines`, `SQLite`, and `uv projects lockfile`.
 
-The [walkthrough](docs/walkthrough.md) explains folder retrieval step by step. The [catalog lesson](docs/catalog.md) explains stable IDs, foreign keys, transactions, hashes, and coordinates; the [OCR lesson](docs/ocr-observations.md) adds observation provenance. The [search lesson](docs/catalog-search.md) explains the FTS5 index, triggers, safe queries, and BM25. The [engine lesson](docs/engine-contract.md) adds process pipes, JSON framing, versioned contracts, and typed errors. The [native integration lesson](../docs/native-engine.md) follows the first real Swift client. The [retrieval evaluation guide](docs/retrieval-evaluation.md) adds labeled folder comparisons; expand the starter with verified positive image IDs before drawing quality conclusions. Next, design explicit native capture import/write operations. The current engine uses a local subprocess; no HTTP server or MCP bridge exists yet. The public website runs separately.
+The [walkthrough](docs/walkthrough.md) explains folder retrieval step by step. The [catalog lesson](docs/catalog.md) explains stable IDs, foreign keys, transactions, hashes, and coordinates; the [OCR lesson](docs/ocr-observations.md) adds observation provenance. The [search lesson](docs/catalog-search.md) explains the FTS5 index, triggers, safe queries, and BM25. The [engine lesson](docs/engine-contract.md) covers process pipes, JSON framing, MCP, payloads, and typed errors. The [native integration lesson](../docs/native-engine.md) follows the Swift client. The [retrieval evaluation guide](docs/retrieval-evaluation.md) adds labeled folder comparisons; expand the starter with verified positive image IDs before drawing quality conclusions. The engine and MCP server use local subprocesses; there is no HTTP server. The public website runs separately.
