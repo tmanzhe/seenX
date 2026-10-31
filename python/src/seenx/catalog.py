@@ -313,7 +313,10 @@ class Catalog:
                asset_id: str | None = None, revision_id: str | None = None,
                current_only: bool = False, *, principal_id: str | None = None,
                trusted_local: bool = False) -> list:
-        """Require a grant-scoped principal or explicit trusted owner access."""
+        """Return FTS5 hits with revision, region target, and full note (None for OCR).
+
+        Require a grant-scoped principal or explicit trusted owner access.
+        """
         from seenx.catalog_search import search_catalog
         return search_catalog(self.connection, query, match, limit, asset_id, revision_id, current_only,
                               principal_id=principal_id, trusted_local=trusted_local)
