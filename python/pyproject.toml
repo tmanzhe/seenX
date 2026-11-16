@@ -7,7 +7,7 @@ name = "seenx"
 version = "0.1.0"
 description = "Local text and visual retrieval prototype for seenX"
 requires-python = ">=3.13"
-dependencies = ["Pillow>=13.0,<14", "pypdf>=6,<7"]
+dependencies = ["Pillow>=13.0,<14", "pypdf>=6,<8"]
 
 [project.optional-dependencies]
 mcp = ["mcp>=1.28,<2"]
